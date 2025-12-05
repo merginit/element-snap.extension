@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.17] - 2025-12-05
+- Extract magic numbers into named constants for better maintainability
+
 ## [0.1.16] - 2025-12-05
 - Log warnings instead of silently swallowing errors in catch blocks
 

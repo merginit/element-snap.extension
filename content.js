@@ -75,6 +75,19 @@ function supportsAlpha(fmt) {
 
 const PANEL_W = 280;
 const PANEL_MARGIN = 8;
+const PANEL_APPROX_H = 260;
+
+const Z_OVERLAY = 2147483640;
+const Z_PADMASK = 2147483642;
+const Z_OUTLINE = 2147483644;
+const Z_PANEL = 2147483646;
+const Z_HOST = 2147483647;
+
+const CLICK_SUPPRESS_MS = 350;
+const CAPTURE_TIMEOUT_MS = 5000;
+const PERSIST_DEBOUNCE_MS = 300;
+const SCROLL_INTO_VIEW_MS = 120;
+const FRAME_SETTLE_MS = 30;
 
 const STYLE = css`
   :host {
@@ -94,7 +107,7 @@ const STYLE = css`
     position: fixed;
     inset: 0;
     pointer-events: none;
-    z-index: 2147483640;
+    z-index: ${Z_OVERLAY};
   }
   #es-outline {
     position: fixed;
@@ -104,13 +117,13 @@ const STYLE = css`
     border-radius: 0px;
     box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
     transition: left 80ms, top 80ms, width 80ms, height 80ms;
-    z-index: 2147483644;
+    z-index: ${Z_OUTLINE};
   }
   #es-padmask {
     position: fixed;
     inset: 0;
     pointer-events: none;
-    z-index: 2147483642;
+    z-index: ${Z_PADMASK};
   }
   .es-pad {
     position: fixed;
@@ -119,7 +132,7 @@ const STYLE = css`
   #es-panel {
     position: fixed;
     width: ${PANEL_W}px;
-    z-index: 2147483646;
+    z-index: ${Z_PANEL};
     pointer-events: auto;
     font: 12px/1.4 -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Inter,
       Helvetica, Arial, sans-serif;
@@ -224,7 +237,7 @@ function ensureHost() {
     host.style.all = "initial";
     host.style.position = "fixed";
     host.style.inset = "0";
-    host.style.zIndex = "2147483647";
+    host.style.zIndex = String(Z_HOST);
     host.style.pointerEvents = "none";
     document.body.appendChild(host);
   }
@@ -345,7 +358,7 @@ function persistSettings() {
   if (persistTimer) clearTimeout(persistTimer);
   persistTimer = setTimeout(() => {
     chrome.storage.sync.set({ elementShotPrefs: settings });
-  }, 300);
+  }, PERSIST_DEBOUNCE_MS);
 }
 
 function throttleRaf(fn) {
@@ -390,7 +403,7 @@ function computePanelPosition(rect) {
   const vw = window.innerWidth,
     vh = window.innerHeight;
   const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-  const approxH = 260;
+  const approxH = PANEL_APPROX_H;
   const left = Number(rect.x) || 0;
   const top = Number(rect.y) || 0;
   const width = Math.max(0, Number(rect.width) || 0);
@@ -426,7 +439,7 @@ function getPanelApproxHeight() {
     const r = panel.getBoundingClientRect();
     if (r && r.height) return Math.min(r.height, window.innerHeight - 16);
   }
-  return 260;
+  return PANEL_APPROX_H;
 }
 
 function clampPanelPos(pos) {
@@ -906,7 +919,7 @@ const onMouseDown = (e) => {
   window.addEventListener("mousedown", clickSuppressHandler, true);
   clickSuppressTimer = setTimeout(() => {
     cleanupClickSuppression();
-  }, 350);
+  }, CLICK_SUPPRESS_MS);
   e.preventDefault();
   e.stopPropagation();
   captureFlow();
@@ -968,7 +981,7 @@ function renderPanel() {
     panel = document.createElement("div");
     panel.id = "es-panel";
     panel.style.position = "fixed";
-    panel.style.zIndex = "2147483646";
+    panel.style.zIndex = String(Z_PANEL);
     panel.style.pointerEvents = "auto";
     panel.style.maxWidth = PANEL_W + "px";
     panel.style.willChange = "transform";
@@ -1380,7 +1393,7 @@ async function captureFlow() {
   try {
     if (!currentTarget) return;
     currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" });
-    await new Promise((r) => setTimeout(r, 120));
+    await new Promise((r) => setTimeout(r, SCROLL_INTO_VIEW_MS));
     const r = currentTarget.getBoundingClientRect();
     currentRect = {
       x: Math.round(r.left),
@@ -1392,14 +1405,14 @@ async function captureFlow() {
     // Detach UI to guarantee it won't appear in capture
     const ctx = detachUI();
     await waitFrames(2);
-    await new Promise((r) => setTimeout(r, 30));
+    await new Promise((r) => setTimeout(r, FRAME_SETTLE_MS));
 
     const dpr = window.devicePixelRatio || 1;
     const cap = await withTimeout(
       new Promise((resolve) =>
         chrome.runtime.sendMessage({ type: "CAPTURE" }, resolve)
       ),
-      5000
+      CAPTURE_TIMEOUT_MS
     );
 
     reattachUI(ctx);
@@ -1572,7 +1585,7 @@ async function captureFlow() {
           resolve
         )
       ),
-      5000
+      CAPTURE_TIMEOUT_MS
     );
   } catch (err) {
     console.warn("Element Shot error:", err);
