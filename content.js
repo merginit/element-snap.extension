@@ -208,8 +208,9 @@ function ensureHost() {
     host.style.all = "initial";
     host.style.position = "fixed";
     host.style.inset = "0";
+    host.style.zIndex = "2147483647";
     host.style.pointerEvents = "none";
-    document.documentElement.appendChild(host);
+    document.body.appendChild(host);
   }
   if (!host.shadowRoot) {
     shadowRoot = host.attachShadow({ mode: "open" });
