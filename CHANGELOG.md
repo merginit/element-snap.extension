@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.19] - 2025-12-05
+- Add element existence check before capture to handle removed DOM elements
+
 ## [0.1.18] - 2025-12-05
 - Optimize panel rendering to skip full rebuild when only dynamic content changes
 

@@ -1445,7 +1445,7 @@ function getPadsPx(dpr) {
 
 async function captureFlow() {
   try {
-    if (!currentTarget) return;
+    if (!currentTarget || !document.contains(currentTarget)) return;
     currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" });
     await new Promise((r) => setTimeout(r, SCROLL_INTO_VIEW_MS));
     const r = currentTarget.getBoundingClientRect();
