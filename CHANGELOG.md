@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.18] - 2025-12-05
+- Optimize panel rendering to skip full rebuild when only dynamic content changes
+
 ## [0.1.17] - 2025-12-05
 - Extract magic numbers into named constants for better maintainability
 

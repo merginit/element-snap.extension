@@ -52,6 +52,7 @@ let panelPos = null; // sticky panel position ({ left, top })
 let patternTile = null;
 let clickSuppressTimer = null;
 let clickSuppressHandler = null;
+let panelState = null; // tracks { mode, format, paddingType, isAlpha } to avoid unnecessary rebuilds
 
 function getPatternTile() {
   if (!patternTile) {
@@ -301,6 +302,7 @@ function removeOverlay() {
   if (panel) {
     panel.remove();
     panel = null;
+    panelState = null;
   }
   if (overlay) {
     overlay.remove();
@@ -972,12 +974,56 @@ function onKeyDown(e) {
   }
 }
 
+function getPanelStructureKey() {
+  const isAlpha = supportsAlpha(settings.format);
+  const showQuality = settings.format === "jpg" || settings.format === "webp";
+  return `${settings.paddingMode}|${isAlpha}|${settings.paddingType}|${showQuality}`;
+}
+
+function updatePanelDynamicContent() {
+  if (!panel) return;
+  
+  // Update lock button
+  const lockBtn = panel.querySelector("#es-lock");
+  if (lockBtn) {
+    lockBtn.textContent = LOCKED ? "Locked" : "Lock";
+    lockBtn.classList.toggle("primary", LOCKED);
+  }
+  
+  // Update toggle button
+  const toggleBtn = panel.querySelector("#es-toggle");
+  if (toggleBtn) {
+    toggleBtn.textContent = ACTIVE ? "Off" : "On";
+  }
+  
+  // Update mode buttons
+  const uniform = settings.paddingMode === "uniform";
+  const modeU = panel.querySelector("#es-mode-u");
+  const modeS = panel.querySelector("#es-mode-s");
+  if (modeU) modeU.classList.toggle("primary", uniform);
+  if (modeS) modeS.classList.toggle("primary", !uniform);
+  
+  // Update transparency buttons
+  const isAlpha = supportsAlpha(settings.format);
+  if (isAlpha) {
+    const tBtn = panel.querySelector("#es-pad-t");
+    const cBtn = panel.querySelector("#es-pad-c");
+    if (tBtn) tBtn.classList.toggle("primary", settings.paddingType === "transparent");
+    if (cBtn) cBtn.classList.toggle("primary", settings.paddingType === "colored");
+  }
+  
+  updateHiddenList();
+  applyPanelOpacity();
+}
+
 function renderPanel() {
   if (!currentRect) {
     if (panel) panel.style.display = "none";
     return;
   }
-  if (!panel) {
+  
+  const needsCreate = !panel;
+  if (needsCreate) {
     panel = document.createElement("div");
     panel.id = "es-panel";
     panel.style.position = "fixed";
@@ -997,6 +1043,14 @@ function renderPanel() {
     width: currentRect.width + 2 * (Number(settings.captureMargin) || 0),
     height: currentRect.height + 2 * (Number(settings.captureMargin) || 0),
   });
+
+  // Check if we can skip full rebuild
+  const newStructureKey = getPanelStructureKey();
+  if (!needsCreate && panelState === newStructureKey) {
+    updatePanelDynamicContent();
+    return;
+  }
+  panelState = newStructureKey;
 
   const isAlpha = supportsAlpha(settings.format);
   const uniform = settings.paddingMode === "uniform";
