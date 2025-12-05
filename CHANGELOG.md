@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.15] - 2025-12-05
+- Add 5s timeout to capture and download calls to prevent UI hanging
+
 ## [0.1.14] - 2025-12-05
 - Fix click suppression event listeners not cleaned up when extension disabled
 

@@ -747,6 +747,15 @@ function cleanupClickSuppression() {
   SUPPRESS_NEXT_CLICK = false;
 }
 
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("TIMEOUT")), ms)
+    ),
+  ]);
+}
+
 function escapeHtml(s) {
   return String(s)
     .replace(/&/g, "&amp;")
@@ -1381,8 +1390,11 @@ async function captureFlow() {
     await new Promise((r) => setTimeout(r, 30));
 
     const dpr = window.devicePixelRatio || 1;
-    const cap = await new Promise((resolve) =>
-      chrome.runtime.sendMessage({ type: "CAPTURE" }, resolve)
+    const cap = await withTimeout(
+      new Promise((resolve) =>
+        chrome.runtime.sendMessage({ type: "CAPTURE" }, resolve)
+      ),
+      5000
     );
 
     reattachUI(ctx);
@@ -1548,11 +1560,14 @@ async function captureFlow() {
       settings.filenamePrefix || "element-screenshot"
     );
     const filename = `${prefixSafe}-${ts}.${ext}`;
-    await new Promise((resolve) =>
-      chrome.runtime.sendMessage(
-        { type: "DOWNLOAD", dataUrl, filename },
-        resolve
-      )
+    await withTimeout(
+      new Promise((resolve) =>
+        chrome.runtime.sendMessage(
+          { type: "DOWNLOAD", dataUrl, filename },
+          resolve
+        )
+      ),
+      5000
     );
   } catch (err) {
     console.warn("Element Shot error:", err);
