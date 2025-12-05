@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.12] - 2025-12-05
+- Cache checkerboard pattern tile to avoid recreating canvas on every mouse move
+
 ## [0.1.11] - 2025-12-05
 - Fix overlay appearing behind page elements by setting max z-index directly on host and changing injection point
 

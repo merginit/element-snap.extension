@@ -49,6 +49,20 @@ let hiddenElements = []; // stack of { el, prevStyle, hadStyleAttr, label }
 let host = null;
 let shadowRoot = null;
 let panelPos = null; // sticky panel position ({ left, top })
+let patternTile = null;
+
+function getPatternTile() {
+  if (!patternTile) {
+    patternTile = document.createElement("canvas");
+    patternTile.width = 12;
+    patternTile.height = 12;
+    const t = patternTile.getContext("2d");
+    t.fillStyle = "#e5e7eb";
+    t.fillRect(0, 0, 6, 6);
+    t.fillRect(6, 6, 6, 6);
+  }
+  return patternTile;
+}
 
 function css(strings) {
   return strings.join("");
@@ -593,14 +607,7 @@ function setPadPreview(rect) {
       if (useColor) {
         padCtx.fillStyle = settings.paddingColor;
       } else {
-        const tile = document.createElement("canvas");
-        tile.width = 12;
-        tile.height = 12;
-        const t = tile.getContext("2d");
-        t.fillStyle = "#e5e7eb";
-        t.fillRect(0, 0, 6, 6);
-        t.fillRect(6, 6, 6, 6);
-        padCtx.fillStyle = padCtx.createPattern(tile, "repeat");
+        padCtx.fillStyle = padCtx.createPattern(getPatternTile(), "repeat");
       }
       padCtx.fill("evenodd");
     }
@@ -624,14 +631,7 @@ function setPadPreview(rect) {
         contentRect.h,
         rContent
       );
-      const tile2 = document.createElement("canvas");
-      tile2.width = 12;
-      tile2.height = 12;
-      const t2 = tile2.getContext("2d");
-      t2.fillStyle = "#e5e7eb";
-      t2.fillRect(0, 0, 6, 6);
-      t2.fillRect(6, 6, 6, 6);
-      padCtx.fillStyle = padCtx.createPattern(tile2, "repeat");
+      padCtx.fillStyle = padCtx.createPattern(getPatternTile(), "repeat");
       padCtx.fill("evenodd");
     }
 
