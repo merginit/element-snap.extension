@@ -299,7 +299,9 @@ function removeOverlay() {
   if (host) {
     try {
       host.remove();
-    } catch (_) {}
+    } catch (err) {
+      console.warn("Element Snap: failed to remove host", err);
+    }
     host = null;
     shadowRoot = null;
   }
@@ -817,7 +819,8 @@ function hideCurrentElement() {
       label: nodeLabel(el),
     });
     return true;
-  } catch (_) {
+  } catch (err) {
+    console.warn("Element Snap: failed to hide element", err);
     return false;
   }
 }
@@ -830,7 +833,8 @@ function restoreLastHidden() {
     if (item.hadStyleAttr) item.el.setAttribute("style", item.prevStyle);
     else item.el.removeAttribute("style");
     return true;
-  } catch (_) {
+  } catch (err) {
+    console.warn("Element Snap: failed to restore element", err);
     return false;
   }
 }
@@ -844,7 +848,8 @@ function restoreHiddenAt(index) {
     else item.el.removeAttribute("style");
     hiddenElements.splice(index, 1);
     return true;
-  } catch (_) {
+  } catch (err) {
+    console.warn("Element Snap: failed to restore element at index", index, err);
     return false;
   }
 }

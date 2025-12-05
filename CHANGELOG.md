@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.16] - 2025-12-05
+- Log warnings instead of silently swallowing errors in catch blocks
+
 ## [0.1.15] - 2025-12-05
 - Add 5s timeout to capture and download calls to prevent UI hanging
 
