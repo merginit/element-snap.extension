@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.24] - 2025-12-05
+- Add German locale strings for extension UI metadata
+
 ## [0.1.23] - 2025-12-05
 - Extract DEFAULTS and migrateSettings into shared.js to eliminate code duplication
 
