@@ -9,7 +9,6 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
-
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
@@ -878,7 +877,7 @@ function restoreAllHidden() {
 
 const onMouseDown = (e) => {
   if (!ACTIVE) return;
-  // Ignore interactions on the panel region (events may retarget to host)
+  // Ignore interactions on the panel region (events may re-target to host)
   if (panel) {
     const pr = panel.getBoundingClientRect();
     if (
