@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.13] - 2025-12-05
+- Debounce settings persistence to reduce storage writes during slider drag
+
 ## [0.1.12] - 2025-12-05
 - Cache checkerboard pattern tile to avoid recreating canvas on every mouse move
 

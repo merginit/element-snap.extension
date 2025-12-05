@@ -336,8 +336,12 @@ function loadSettings() {
   });
 }
 
+let persistTimer = null;
 function persistSettings() {
-  chrome.storage.sync.set({ elementShotPrefs: settings });
+  if (persistTimer) clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => {
+    chrome.storage.sync.set({ elementShotPrefs: settings });
+  }, 300);
 }
 
 function throttleRaf(fn) {
