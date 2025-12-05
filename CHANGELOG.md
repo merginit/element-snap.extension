@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.23] - 2025-12-05
+- Extract DEFAULTS and migrateSettings into shared.js to eliminate code duplication
+
 ## [0.1.22] - 2025-12-05
 - Fix css tagged template function not interpolating z-index values
 

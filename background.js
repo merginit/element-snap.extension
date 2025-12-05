@@ -38,7 +38,7 @@ async function ensureInjected(tabId) {
     try {
       await chrome.scripting.executeScript({
         target: { tabId },
-        files: ["content.js"],
+        files: ["shared.js", "content.js"],
       });
       await new Promise((r) => setTimeout(r, 80));
       return true;

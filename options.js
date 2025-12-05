@@ -16,43 +16,6 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-const DEFAULTS = {
-  padding: 10,
-  paddingMode: "uniform",
-  paddingSides: { top: 10, right: 10, bottom: 10, left: 10 },
-  paddingType: "transparent",
-  paddingColor: "#EEF2FF",
-  captureMargin: 0,
-  format: "png",
-  quality: 90,
-  filenamePrefix: "element-screenshot",
-  panelOpacityLow: false,
-  roundedRadius: 0,
-};
-
-function migrateSettings(prefs) {
-  const out = { ...DEFAULTS, ...(prefs || {}) };
-  if (!prefs || typeof prefs !== "object") return out;
-  if (!prefs.paddingSides) {
-    const p = Number(prefs.padding ?? DEFAULTS.padding) || 0;
-    out.paddingSides = { top: p, right: p, bottom: p, left: p };
-  } else {
-    const s = prefs.paddingSides;
-    out.paddingSides = {
-      top: Number(s.top ?? 0) || 0,
-      right: Number(s.right ?? 0) || 0,
-      bottom: Number(s.bottom ?? 0) || 0,
-      left: Number(s.left ?? 0) || 0,
-    };
-  }
-  if (out.paddingMode !== "uniform" && out.paddingMode !== "sides")
-    out.paddingMode = "uniform";
-  out.captureMargin = Number(prefs.captureMargin ?? 0) || 0;
-  out.panelOpacityLow = !!prefs.panelOpacityLow;
-  out.roundedRadius = Math.max(0, Number(prefs.roundedRadius ?? 0) || 0);
-  return out;
-}
-
 function load() {
   chrome.storage.sync.get({ elementShotPrefs: DEFAULTS }, (data) => {
     const s = migrateSettings(data.elementShotPrefs || DEFAULTS);
