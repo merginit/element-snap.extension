@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.14] - 2025-12-05
+- Fix click suppression event listeners not cleaned up when extension disabled
+
 ## [0.1.13] - 2025-12-05
 - Debounce settings persistence to reduce storage writes during slider drag
 

@@ -50,6 +50,8 @@ let host = null;
 let shadowRoot = null;
 let panelPos = null; // sticky panel position ({ left, top })
 let patternTile = null;
+let clickSuppressTimer = null;
+let clickSuppressHandler = null;
 
 function getPatternTile() {
   if (!patternTile) {
@@ -731,6 +733,20 @@ const onResize = throttleRaf(() => {
   }
 });
 
+function cleanupClickSuppression() {
+  if (clickSuppressTimer) {
+    clearTimeout(clickSuppressTimer);
+    clickSuppressTimer = null;
+  }
+  if (clickSuppressHandler) {
+    window.removeEventListener("click", clickSuppressHandler, true);
+    window.removeEventListener("mouseup", clickSuppressHandler, true);
+    window.removeEventListener("mousedown", clickSuppressHandler, true);
+    clickSuppressHandler = null;
+  }
+  SUPPRESS_NEXT_CLICK = false;
+}
+
 function escapeHtml(s) {
   return String(s)
     .replace(/&/g, "&amp;")
@@ -862,22 +878,20 @@ const onMouseDown = (e) => {
     height: Math.round(r.height),
   };
   // prevent page interaction for this click
+  cleanupClickSuppression();
   SUPPRESS_NEXT_CLICK = true;
-  const stop = (ev) => {
+  clickSuppressHandler = (ev) => {
     if (SUPPRESS_NEXT_CLICK) {
       ev.preventDefault();
       ev.stopPropagation();
       ev.stopImmediatePropagation();
     }
   };
-  window.addEventListener("click", stop, true);
-  window.addEventListener("mouseup", stop, true);
-  window.addEventListener("mousedown", stop, true);
-  setTimeout(() => {
-    SUPPRESS_NEXT_CLICK = false;
-    window.removeEventListener("click", stop, true);
-    window.removeEventListener("mouseup", stop, true);
-    window.removeEventListener("mousedown", stop, true);
+  window.addEventListener("click", clickSuppressHandler, true);
+  window.addEventListener("mouseup", clickSuppressHandler, true);
+  window.addEventListener("mousedown", clickSuppressHandler, true);
+  clickSuppressTimer = setTimeout(() => {
+    cleanupClickSuppression();
   }, 350);
   e.preventDefault();
   e.stopPropagation();
@@ -1580,6 +1594,7 @@ async function enable() {
 function disable() {
   ACTIVE = false;
   LOCKED = false;
+  cleanupClickSuppression();
   window.removeEventListener("mousemove", onMouseMove, { capture: true });
   window.removeEventListener("mousedown", onMouseDown, { capture: true });
   window.removeEventListener("keydown", onKeyDown, { capture: true });
