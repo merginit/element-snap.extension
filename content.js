@@ -971,6 +971,7 @@ function onKeyDown(e) {
   if (e.key === "r" || e.key === "R") {
     if (e.shiftKey) restoreAllHidden();
     else restoreLastHidden();
+    updateHiddenList();
   }
 }
 
