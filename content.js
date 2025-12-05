@@ -41,7 +41,6 @@ let overlay, box, panel;
 let padMask, padTop, padRight, padBottom, padLeft;
 let padCanvas = null,
   padCtx = null;
-let canvasDpr = 1;
 let rafId = null;
 let hideTimer = null;
 let lockRaf = null;
@@ -606,15 +605,6 @@ function setPadPreview(rect) {
       Math.floor(Math.min(contentRect.w, contentRect.h) / 2)
     );
 
-    function roundRectPath(ctx, x, y, w, h, r) {
-      ctx.moveTo(x + r, y);
-      ctx.arcTo(x + w, y, x + w, y + h, r);
-      ctx.arcTo(x + w, y + h, x, y + h, r);
-      ctx.arcTo(x, y + h, x, y, r);
-      ctx.arcTo(x, y, x + w, y, r);
-      ctx.closePath();
-    }
-
     // 1) Padding band: outer(rounded) - margin(rounded)
     if (pads.l + pads.r + pads.t + pads.b > 0) {
       padCtx.beginPath();
@@ -771,6 +761,15 @@ function withTimeout(promise, ms) {
       setTimeout(() => reject(new Error("TIMEOUT")), ms)
     ),
   ]);
+}
+
+function roundRectPath(ctx, x, y, w, h, r) {
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
 }
 
 function escapeHtml(s) {
@@ -1570,23 +1569,14 @@ async function captureFlow() {
       Math.floor(Math.min(contentRect.w, contentRect.h) / 2)
     );
 
-    function pathRoundRect(ctx, x, y, w, h, r) {
-      ctx.moveTo(x + r, y);
-      ctx.arcTo(x + w, y, x + w, y + h, r);
-      ctx.arcTo(x + w, y + h, x, y + h, r);
-      ctx.arcTo(x, y + h, x, y, r);
-      ctx.arcTo(x, y, x + w, y, r);
-      ctx.closePath();
-    }
-
     const fillColor = settings.paddingColor || "#ffffff";
 
     // Padding ring: outer - margin
     if (pad.l + pad.r + pad.t + pad.b > 0) {
       if (settings.paddingType === "colored" || !isAlpha) {
         ctx2.beginPath();
-        pathRoundRect(ctx2, outer.x, outer.y, outer.w, outer.h, rOuter);
-        pathRoundRect(
+        roundRectPath(ctx2, outer.x, outer.y, outer.w, outer.h, rOuter);
+        roundRectPath(
           ctx2,
           marginRect.x,
           marginRect.y,
@@ -1690,15 +1680,6 @@ function disable() {
   document.removeEventListener("scroll", onScroll, { capture: true });
   window.removeEventListener("resize", onResize);
   removeOverlay();
-}
-
-function toggleActive(next) {
-  if (next === false) {
-    disable();
-    return;
-  }
-  if (ACTIVE) disable();
-  else enable();
 }
 
 function setActiveSoft(nextActive) {

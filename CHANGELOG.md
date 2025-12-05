@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.21] - 2025-12-05
+- Remove unused variable and function, consolidate duplicate roundRectPath
+
 ## [0.1.20] - 2025-12-05
 - Fix hidden elements list not updating when using R key to restore
 
