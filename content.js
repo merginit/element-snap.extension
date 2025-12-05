@@ -65,8 +65,8 @@ function getPatternTile() {
   return patternTile;
 }
 
-function css(strings) {
-  return strings.join("");
+function css(strings, ...values) {
+  return strings.reduce((acc, str, i) => acc + str + (values[i] ?? ""), "");
 }
 function supportsAlpha(fmt) {
   return fmt === "png" || fmt === "webp" || fmt === "svg";

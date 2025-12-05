@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.22] - 2025-12-05
+- Fix css tagged template function not interpolating z-index values
+
 ## [0.1.21] - 2025-12-05
 - Remove unused variable and function, consolidate duplicate roundRectPath
 
