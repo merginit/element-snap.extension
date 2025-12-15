@@ -16,33 +16,63 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+let currentTheme = "system";
+
+function getEffectiveTheme(theme) {
+  if (theme === "system") {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  }
+  return theme;
+}
+
+function applyTheme(theme) {
+  currentTheme = theme;
+  const effective = getEffectiveTheme(theme);
+  document.documentElement.classList.toggle("dark", effective === "dark");
+  updateThemeButtons();
+}
+
+function updateThemeButtons() {
+  const lightBtn = document.getElementById("opt-theme-light");
+  const darkBtn = document.getElementById("opt-theme-dark");
+  const systemBtn = document.getElementById("opt-theme-system");
+  [lightBtn, darkBtn, systemBtn].forEach((btn) => btn?.classList.remove("active"));
+  if (currentTheme === "light") lightBtn?.classList.add("active");
+  else if (currentTheme === "dark") darkBtn?.classList.add("active");
+  else systemBtn?.classList.add("active");
+}
+
 function load() {
   chrome.storage.sync.get({ elementShotPrefs: DEFAULTS }, (data) => {
     const s = migrateSettings(data.elementShotPrefs || DEFAULTS);
+
+    applyTheme(s.theme || "system");
+
     document.getElementById("opt-mode").value = s.paddingMode;
     document.getElementById("opt-name").value = s.filenamePrefix;
     document.getElementById("opt-pad").value = s.padding;
-    document.getElementById("lbl-pad").textContent = s.padding + "px";
+    document.getElementById("lbl-pad").value = s.padding;
     document.getElementById("opt-cm").value = s.captureMargin;
-    document.getElementById("lbl-cm").textContent = s.captureMargin + "px";
+    document.getElementById("lbl-cm").value = s.captureMargin;
     document.getElementById("opt-color").value = s.paddingColor;
     document.getElementById("opt-ptype").value = s.paddingType;
     document.getElementById("opt-r").value = s.roundedRadius;
-    document.getElementById("lbl-r").textContent = s.roundedRadius + "px";
+    document.getElementById("lbl-r").value = s.roundedRadius;
     document.getElementById("opt-format").value = s.format;
     document.getElementById("opt-q").value = s.quality;
-    document.getElementById("lbl-q").textContent = s.quality + "%";
+    document.getElementById("lbl-q").value = s.quality;
 
     // Per-side
     document.getElementById("opt-pt").value = s.paddingSides.top;
     document.getElementById("opt-pr").value = s.paddingSides.right;
     document.getElementById("opt-pb").value = s.paddingSides.bottom;
     document.getElementById("opt-pl").value = s.paddingSides.left;
-    document.getElementById("lbl-pt").textContent = s.paddingSides.top + "px";
-    document.getElementById("lbl-pr").textContent = s.paddingSides.right + "px";
-    document.getElementById("lbl-pb").textContent =
-      s.paddingSides.bottom + "px";
-    document.getElementById("lbl-pl").textContent = s.paddingSides.left + "px";
+    document.getElementById("lbl-pt").value = s.paddingSides.top;
+    document.getElementById("lbl-pr").value = s.paddingSides.right;
+    document.getElementById("lbl-pb").value = s.paddingSides.bottom;
+    document.getElementById("lbl-pl").value = s.paddingSides.left;
 
     toggleModeSections(s.paddingMode);
     toggleQualitySection(s.format);
@@ -51,6 +81,7 @@ function load() {
 
 function save() {
   const prefs = {};
+  prefs.theme = currentTheme;
   prefs.paddingMode = document.getElementById("opt-mode").value;
   prefs.filenamePrefix = document.getElementById("opt-name").value;
   prefs.padding = Number(document.getElementById("opt-pad").value) || 0;
@@ -97,6 +128,23 @@ function resetDefaults() {
 
 document.addEventListener("DOMContentLoaded", () => {
   load();
+
+  document.getElementById("opt-theme-light").addEventListener("click", () => {
+    applyTheme("light");
+  });
+  document.getElementById("opt-theme-dark").addEventListener("click", () => {
+    applyTheme("dark");
+  });
+  document.getElementById("opt-theme-system").addEventListener("click", () => {
+    applyTheme("system");
+  });
+
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    if (currentTheme === "system") {
+      applyTheme("system");
+    }
+  });
+
   document.getElementById("opt-mode").addEventListener("change", (e) => {
     toggleModeSections(e.target.value);
   });
@@ -112,20 +160,39 @@ document.addEventListener("DOMContentLoaded", () => {
     toggleQualitySection(e.target.value);
   });
 
-  // Live labels
-  const bindLabel = (id, lbl, suf = "px") => {
-    const el = document.getElementById(id);
-    const out = document.getElementById(lbl);
-    el.addEventListener("input", () => (out.textContent = el.value + suf));
+  // Bidirectional binding between range sliders and number inputs
+  const bindSlider = (sliderId, inputId) => {
+    const slider = document.getElementById(sliderId);
+    const input = document.getElementById(inputId);
+    const min = Number(slider.min);
+    const max = Number(slider.max);
+
+    slider.addEventListener("input", () => {
+      input.value = slider.value;
+    });
+
+    input.addEventListener("input", () => {
+      let val = Number(input.value) || 0;
+      val = Math.max(min, Math.min(max, val));
+      slider.value = val;
+    });
+
+    input.addEventListener("blur", () => {
+      let val = Number(input.value) || 0;
+      val = Math.max(min, Math.min(max, val));
+      input.value = val;
+      slider.value = val;
+    });
   };
-  bindLabel("opt-pad", "lbl-pad");
-  bindLabel("opt-cm", "lbl-cm");
-  bindLabel("opt-r", "lbl-r");
-  bindLabel("opt-pt", "lbl-pt");
-  bindLabel("opt-pr", "lbl-pr");
-  bindLabel("opt-pb", "lbl-pb");
-  bindLabel("opt-pl", "lbl-pl");
-  bindLabel("opt-q", "lbl-q", "%");
+
+  bindSlider("opt-pad", "lbl-pad");
+  bindSlider("opt-cm", "lbl-cm");
+  bindSlider("opt-r", "lbl-r");
+  bindSlider("opt-pt", "lbl-pt");
+  bindSlider("opt-pr", "lbl-pr");
+  bindSlider("opt-pb", "lbl-pb");
+  bindSlider("opt-pl", "lbl-pl");
+  bindSlider("opt-q", "lbl-q");
 });
 
 function toggleModeSections(mode) {

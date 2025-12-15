@@ -77,6 +77,32 @@ const FRAME_SETTLE_MS = 30;
 const STYLE = css`
   :host {
     all: initial;
+    /* Light theme (default) */
+    --es-background: oklch(1 0 0);
+    --es-foreground: oklch(0.145 0 0);
+    --es-card: oklch(1 0 0);
+    --es-card-foreground: oklch(0.145 0 0);
+    --es-primary: oklch(0.488 0.243 264.376);
+    --es-primary-foreground: oklch(0.97 0.014 254.604);
+    --es-muted: oklch(0.97 0 0);
+    --es-muted-foreground: oklch(0.556 0 0);
+    --es-accent: oklch(0.97 0 0);
+    --es-border: oklch(0.922 0 0);
+    --es-input: oklch(0.922 0 0);
+    --es-radius: 0.625rem;
+  }
+  :host(.dark) {
+    --es-background: oklch(0.145 0 0);
+    --es-foreground: oklch(0.985 0 0);
+    --es-card: oklch(0.205 0 0);
+    --es-card-foreground: oklch(0.985 0 0);
+    --es-primary: oklch(0.42 0.18 266);
+    --es-primary-foreground: oklch(0.97 0.014 254.604);
+    --es-muted: oklch(0.269 0 0);
+    --es-muted-foreground: oklch(0.708 0 0);
+    --es-accent: oklch(0.371 0 0);
+    --es-border: oklch(1 0 0 / 10%);
+    --es-input: oklch(1 0 0 / 15%);
   }
   * {
     box-sizing: border-box;
@@ -96,11 +122,11 @@ const STYLE = css`
   }
   #es-outline {
     position: fixed;
-    border: 2px solid #2563eb;
-    outline: 2px solid rgba(37, 99, 235, 0.25);
+    border: 2px solid var(--es-primary);
+    outline: 2px solid oklch(from var(--es-primary) l c h / 25%);
     outline-offset: 2px;
     border-radius: 0px;
-    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
+    box-shadow: 0 0 0 4px oklch(from var(--es-primary) l c h / 15%);
     transition: left 80ms, top 80ms, width 80ms, height 80ms;
     z-index: ${Z_OUTLINE};
   }
@@ -119,30 +145,97 @@ const STYLE = css`
     width: ${PANEL_W}px;
     z-index: ${Z_PANEL};
     pointer-events: auto;
-    font: 12px/1.4 -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Inter,
+    font: 12px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter",
       Helvetica, Arial, sans-serif;
-    color: #111827;
+    color: var(--es-card-foreground);
     contain: content;
     transition: opacity 120ms ease;
   }
   #es-panel .card {
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-    padding: 10px;
+    background: var(--es-card);
+    border: 1px solid var(--es-border);
+    border-radius: var(--es-radius);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+    padding: 12px;
     max-height: min(72vh, calc(100vh - 16px));
     overflow: auto;
     overscroll-behavior: contain;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+    scrollbar-width: thin;
+    scrollbar-color: var(--es-muted) transparent;
+  }
+  #es-panel .card::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  #es-panel .card::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 3px;
+  }
+  #es-panel .card::-webkit-scrollbar-thumb {
+    background: var(--es-muted);
+    border-radius: 3px;
+  }
+  #es-panel .card::-webkit-scrollbar-thumb:hover {
+    background: var(--es-muted-foreground);
   }
   #es-panel label {
     display: block;
     font-size: 11px;
-    color: #4b5563;
-    margin: 6px 0 4px;
+    font-weight: 500;
+    color: var(--es-muted-foreground);
+    margin: 8px 0 4px;
   }
   #es-panel input[type="range"] {
     width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--es-muted);
+    appearance: none;
+    cursor: pointer;
+    margin: 0;
+  }
+  #es-panel input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--es-primary);
+    border: none;
+    box-shadow: 0 0 0 0 oklch(from var(--es-primary) l c h / 0%);
+    cursor: pointer;
+    transition: box-shadow 0.2s ease;
+  }
+  #es-panel input[type="range"]::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 0 3px oklch(from var(--es-primary) l c h / 25%);
+  }
+  #es-panel input[type="range"]:active::-webkit-slider-thumb {
+    box-shadow: 0 0 0 4px oklch(from var(--es-primary) l c h / 35%);
+  }
+  #es-panel input[type="range"]::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--es-primary);
+    border: none;
+    box-shadow: 0 0 0 0 oklch(from var(--es-primary) l c h / 0%);
+    cursor: pointer;
+    transition: box-shadow 0.2s ease;
+  }
+  #es-panel input[type="range"]::-moz-range-thumb:hover {
+    box-shadow: 0 0 0 3px oklch(from var(--es-primary) l c h / 25%);
+  }
+  #es-panel input[type="range"]:active::-moz-range-thumb {
+    box-shadow: 0 0 0 4px oklch(from var(--es-primary) l c h / 35%);
+  }
+  #es-panel input[type="range"]:focus {
+    outline: none;
+  }
+  #es-panel input[type="range"]:focus::-webkit-slider-thumb {
+    box-shadow: 0 0 0 3px oklch(from var(--es-primary) l c h / 30%);
+  }
+  #es-panel input[type="range"]:focus::-moz-range-thumb {
+    box-shadow: 0 0 0 3px oklch(from var(--es-primary) l c h / 30%);
   }
   #es-panel .row {
     display: flex;
@@ -159,31 +252,62 @@ const STYLE = css`
     justify-content: center;
     height: 28px;
     padding: 0 10px;
-    border-radius: 6px;
-    border: 1px solid #e5e7eb;
-    background: #f9fafb;
+    border-radius: calc(var(--es-radius) - 2px);
+    border: 1px solid var(--es-border);
+    background: var(--es-card);
+    color: var(--es-card-foreground);
     cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+  }
+  #es-panel .btn:hover {
+    background: var(--es-accent);
   }
   #es-panel .btn.primary {
-    background: #4f46e5;
-    color: #fff;
-    border-color: #4f46e5;
+    background: var(--es-primary);
+    color: var(--es-primary-foreground);
+    border-color: var(--es-primary);
+  }
+  #es-panel .btn.primary:hover {
+    opacity: 0.9;
   }
   #es-panel .btn.ghost {
     background: transparent;
+    border-color: var(--es-border);
+  }
+  #es-panel .btn.ghost:hover {
+    background: var(--es-accent);
   }
   #es-panel select,
   #es-panel input[type="text"],
   #es-panel input[type="color"] {
     height: 28px;
-    border: 1px solid #e5e7eb;
-    border-radius: 6px;
+    border: 1px solid var(--es-border);
+    border-radius: calc(var(--es-radius) - 2px);
     padding: 0 8px;
     width: 100%;
-    background: #fff;
+    background: var(--es-card);
+    color: var(--es-card-foreground);
+    transition: border-color 0.15s ease;
+  }
+  #es-panel select {
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    padding-right: 28px;
+  }
+  #es-panel select:focus,
+  #es-panel input[type="text"]:focus,
+  #es-panel input[type="color"]:focus {
+    outline: none;
+    border-color: var(--es-primary);
+    box-shadow: 0 0 0 2px oklch(from var(--es-primary) l c h / 20%);
   }
   #es-panel .muted {
-    color: #6b7280;
+    color: var(--es-muted-foreground);
     font-size: 11px;
   }
   #es-panel .kbd {
@@ -193,12 +317,12 @@ const STYLE = css`
     min-width: 18px;
     height: 20px;
     padding: 0 6px;
-    border-radius: 6px;
-    border: 1px solid #e5e7eb;
-    background: #f3f4f6;
+    border-radius: calc(var(--es-radius) - 2px);
+    border: 1px solid var(--es-border);
+    background: var(--es-muted);
     font-size: 11px;
     font-weight: 600;
-    color: #111827;
+    color: var(--es-card-foreground);
   }
   #es-panel .shortcut {
     display: flex;
@@ -210,10 +334,16 @@ const STYLE = css`
     grid-template-columns: 1fr 1fr;
     gap: 8px;
   }
+  #es-panel strong {
+    color: var(--es-card-foreground);
+  }
 `;
 
 function ensureHost() {
-  if (host && shadowRoot) return shadowRoot;
+  if (host && shadowRoot) {
+    applyHostTheme();
+    return shadowRoot;
+  }
   host = document.getElementById("es-host");
   if (!host) {
     host = document.createElement("div");
@@ -231,6 +361,7 @@ function ensureHost() {
   } else {
     shadowRoot = host.shadowRoot;
   }
+  applyHostTheme();
   return shadowRoot;
 }
 
@@ -311,10 +442,43 @@ function loadSettings() {
     chrome.storage.sync.get({ elementShotPrefs: DEFAULTS }, (data) => {
       const prefs = migrateSettings(data.elementShotPrefs || DEFAULTS);
       settings = prefs;
+      applyHostTheme();
       resolve(settings);
     });
   });
 }
+
+function getEffectiveTheme(theme) {
+  if (theme === "system") {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  }
+  return theme;
+}
+
+function applyHostTheme() {
+  if (!host) return;
+  const effective = getEffectiveTheme(settings.theme || "system");
+  host.classList.toggle("dark", effective === "dark");
+}
+
+// Listen for theme changes from options page
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "sync" && changes.elementShotPrefs) {
+    const newPrefs = changes.elementShotPrefs.newValue;
+    if (newPrefs && newPrefs.theme !== settings.theme) {
+      settings.theme = newPrefs.theme;
+      applyHostTheme();
+    }
+  }
+});
+
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  if (settings.theme === "system") {
+    applyHostTheme();
+  }
+});
 
 let persistTimer = null;
 function persistSettings() {
@@ -944,27 +1108,27 @@ function getPanelStructureKey() {
 
 function updatePanelDynamicContent() {
   if (!panel) return;
-  
+
   // Update lock button
   const lockBtn = panel.querySelector("#es-lock");
   if (lockBtn) {
     lockBtn.textContent = LOCKED ? "Locked" : "Lock";
     lockBtn.classList.toggle("primary", LOCKED);
   }
-  
+
   // Update toggle button
   const toggleBtn = panel.querySelector("#es-toggle");
   if (toggleBtn) {
     toggleBtn.textContent = ACTIVE ? "Off" : "On";
   }
-  
+
   // Update mode buttons
   const uniform = settings.paddingMode === "uniform";
   const modeU = panel.querySelector("#es-mode-u");
   const modeS = panel.querySelector("#es-mode-s");
   if (modeU) modeU.classList.toggle("primary", uniform);
   if (modeS) modeS.classList.toggle("primary", !uniform);
-  
+
   // Update transparency buttons
   const isAlpha = supportsAlpha(settings.format);
   if (isAlpha) {
@@ -973,7 +1137,7 @@ function updatePanelDynamicContent() {
     if (tBtn) tBtn.classList.toggle("primary", settings.paddingType === "transparent");
     if (cBtn) cBtn.classList.toggle("primary", settings.paddingType === "colored");
   }
-  
+
   updateHiddenList();
   applyPanelOpacity();
 }
@@ -983,7 +1147,7 @@ function renderPanel() {
     if (panel) panel.style.display = "none";
     return;
   }
-  
+
   const needsCreate = !panel;
   if (needsCreate) {
     panel = document.createElement("div");
@@ -1049,105 +1213,86 @@ function renderPanel() {
     </div>`;
 
   const transControls = isAlpha
-    ? `<div class=\"row\" style=\"margin-top:6px;\">\n         <button class=\"btn ${
-        settings.paddingType === "transparent" ? "primary" : ""
-      }\" id=\"es-pad-t\">Transparent</button>\n         <button class=\"btn ${
-        settings.paddingType === "colored" ? "primary" : ""
-      }\" id=\"es-pad-c\">Colored</button>\n       </div>\n       ${
-        settings.paddingType === "colored"
-          ? '<label>Padding Color</label><input id="es-pad-color" type="color" value="' +
-            escapeHtml(settings.paddingColor) +
-            '" />'
-          : ""
-      }`
+    ? `<div class=\"row\" style=\"margin-top:6px;\">\n<button class=\"btn ${settings.paddingType === "transparent" ? "primary" : ""
+    }\" id=\"es-pad-t\">Transparent</button>\n<button class=\"btn ${settings.paddingType === "colored" ? "primary" : ""
+    }\" id=\"es-pad-c\">Colored</button>\n</div>\n${settings.paddingType === "colored"
+      ? '<label>Padding Color</label><input id="es-pad-color" type="color" value="' +
+      escapeHtml(settings.paddingColor) +
+      '" />'
+      : ""
+    }`
     : `<div class=\"row\" style=\"margin-top:6px;\"><span class=\"muted\">Format has no transparency; using Background Color for export.</span></div>\n       <label style=\"margin-top:6px;\">Background Color</label>\n       <input id=\"es-pad-color\" type=\"color\" value=\"${escapeHtml(
-        settings.paddingColor
-      )}\" />`;
+      settings.paddingColor
+    )}\" />`;
 
   panel.innerHTML = `
     <div class="card">
       <div class="row" style="justify-content: space-between; margin-bottom:6px;">
         <strong>Screenshot Settings</strong>
         <div class="row">
-          <button class="btn ${LOCKED ? "primary" : ""}" id="es-lock">${
-    LOCKED ? "Locked" : "Lock"
-  }</button>
-          <button class="btn ghost" id="es-dim">${
-            settings.panelOpacityLow ? "Opaque" : "Dim"
-          }</button>
-          <button class="btn ghost" id="es-toggle">${
-            ACTIVE ? "Off" : "On"
-          }</button>
+          <button class="btn ${LOCKED ? "primary" : ""}" id="es-lock">${LOCKED ? "Locked" : "Lock"
+    }</button>
+          <button class="btn ghost" id="es-dim">${settings.panelOpacityLow ? "Opaque" : "Dim"
+    }</button>
+          <button class="btn ghost" id="es-toggle">${ACTIVE ? "Off" : "On"
+    }</button>
         </div>
       </div>
 
       <label>Padding Mode</label>
       <div class="row">
-        <button class="btn ${
-          uniform ? "primary" : ""
-        }" id="es-mode-u">Uniform</button>
-        <button class="btn ${
-          !uniform ? "primary" : ""
-        }" id="es-mode-s">Per side</button>
+        <button class="btn ${uniform ? "primary" : ""
+    }" id="es-mode-u">Uniform</button>
+        <button class="btn ${!uniform ? "primary" : ""
+    }" id="es-mode-s">Per side</button>
       </div>
 
-      ${
-        uniform
-          ? `<label>Padding: <span id=\"es-pad-label\">${settings.padding}px</span></label>
+      ${uniform
+      ? `<label>Padding: <span id=\"es-pad-label\">${settings.padding}px</span></label>
            <input id=\"es-pad\" type=\"range\" min=\"0\" max=\"50\" step=\"1\" value=\"${settings.padding}\" />`
-          : `<label>Padding (px)</label>${perSideControls}`
-      }
+      : `<label>Padding (px)</label>${perSideControls}`
+    }
 
-      <label style="margin-top:6px;">Capture Margin: <span id="es-cm-label">${
-        settings.captureMargin
-      }px</span></label>
-      <input id="es-cm" type="range" min="0" max="200" step="2" value="${
-        settings.captureMargin
-      }" />
+      <label style="margin-top:6px;">Capture Margin: <span id="es-cm-label">${settings.captureMargin
+    }px</span></label>
+      <input id="es-cm" type="range" min="0" max="200" step="2" value="${settings.captureMargin
+    }" />
 
       ${transControls}
 
-      <label style="margin-top:6px;">Rounded Corners: <span id="es-r-label">${
-        settings.roundedRadius
-      }px</span></label>
-      <input id="es-r" type="range" min="0" max="48" step="1" value="${
-        settings.roundedRadius
-      }" />
+      <label style="margin-top:6px;">Rounded Corners: <span id="es-r-label">${settings.roundedRadius
+    }px</span></label>
+      <input id="es-r" type="range" min="0" max="48" step="1" value="${settings.roundedRadius
+    }" />
 
       <label style="margin-top:6px;">Format</label>
       <select id="es-format">
-        <option value="png" ${
-          settings.format === "png" ? "selected" : ""
-        }>PNG</option>
-        <option value="webp" ${
-          settings.format === "webp" ? "selected" : ""
-        }>WEBP</option>
-        <option value="jpg" ${
-          settings.format === "jpg" ? "selected" : ""
-        }>JPG</option>
-        <option value="svg" ${
-          settings.format === "svg" ? "selected" : ""
-        }>SVG</option>
+        <option value="png" ${settings.format === "png" ? "selected" : ""
+    }>PNG</option>
+        <option value="webp" ${settings.format === "webp" ? "selected" : ""
+    }>WEBP</option>
+        <option value="jpg" ${settings.format === "jpg" ? "selected" : ""
+    }>JPG</option>
+        <option value="svg" ${settings.format === "svg" ? "selected" : ""
+    }>SVG</option>
       </select>
-      ${
-        settings.format === "jpg" || settings.format === "webp"
-          ? '<label>Quality: <span id="es-q-label">' +
-            settings.quality +
-            '%</span></label><input id="es-q" type="range" min="10" max="100" step="5" value="' +
-            settings.quality +
-            '" />'
-          : ""
-      }
+      ${settings.format === "jpg" || settings.format === "webp"
+      ? '<label>Quality: <span id="es-q-label">' +
+      settings.quality +
+      '%</span></label><input id="es-q" type="range" min="10" max="100" step="5" value="' +
+      settings.quality +
+      '" />'
+      : ""
+    }
       <label style="margin-top:6px;">Filename Prefix</label>
       <input id="es-name" type="text" value="${escapeHtml(
-        settings.filenamePrefix
-      )}" />
+      settings.filenamePrefix
+    )}" />
 
       <label style="margin-top:10px;">Clean up</label>
       <div class="muted">Hidden elements: <span id="es-hidden-count">${hiddenCount}</span> - Press <span class="kbd">H</span> to hide current, <span class="kbd">R</span> to restore last, <span class="kbd">Shift</span> + <span class="kbd">R</span> to restore all.</div>
-      <div id="es-hidden-list" style="margin-top:6px; display:grid; gap:6px; max-height:160px; overflow:auto;">${
-        hiddenList || '<div class="muted">No hidden elements yet.</div>'
-      }</div>
+      <div id="es-hidden-list" style="margin-top:6px; display:grid; gap:6px; max-height:160px; overflow:auto;">${hiddenList || '<div class="muted">No hidden elements yet.</div>'
+    }</div>
 
       <div style="margin-top:8px; display:grid; gap:6px;">
         <div class="shortcut"><span class="kbd">Ctrl/Cmd</span><span>+</span><span class="kbd">Click</span><span class="muted">Capture</span></div>
@@ -1568,16 +1713,16 @@ async function captureFlow() {
         settings.format === "jpg"
           ? "image/jpeg"
           : settings.format === "webp"
-          ? "image/webp"
-          : "image/png";
+            ? "image/webp"
+            : "image/png";
       const quality = (settings.quality || 90) / 100;
       dataUrl = canvas.toDataURL(mime, quality);
       ext =
         settings.format === "jpg"
           ? "jpg"
           : settings.format === "webp"
-          ? "webp"
-          : "png";
+            ? "webp"
+            : "png";
     }
 
     const ts = new Date().toISOString().replace(/[:.]/g, "-");

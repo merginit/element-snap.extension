@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.25] - 2025-12-15
+- Complete UI design overhaul
+- Add light/dark theme support with system preference detection
+- Add theme toggle (Light/Dark/System) in Options page
+- Use CSS custom properties for consistent theming across options page and content panel
+- Improve visual design: rounded corners, styled range sliders, better typography, smooth transitions
+
 ## [0.1.24] - 2025-12-05
 - Add German locale strings for extension UI metadata
 

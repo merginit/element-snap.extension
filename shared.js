@@ -17,6 +17,7 @@
  */
 
 const DEFAULTS = {
+  theme: "system", // "light" | "dark" | "system"
   padding: 10,
   paddingMode: "uniform",
   paddingSides: { top: 10, right: 10, bottom: 10, left: 10 },
@@ -33,6 +34,9 @@ const DEFAULTS = {
 function migrateSettings(prefs) {
   const out = { ...DEFAULTS, ...(prefs || {}) };
   if (!prefs || typeof prefs !== "object") return out;
+  if (!prefs.theme || !["light", "dark", "system"].includes(prefs.theme)) {
+    out.theme = "system";
+  }
   if (!prefs.paddingSides) {
     const p = Number(prefs.padding ?? DEFAULTS.padding) || 0;
     out.paddingSides = { top: p, right: p, bottom: p, left: p };

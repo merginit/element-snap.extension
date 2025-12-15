@@ -18,230 +18,496 @@
 
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Element Snap - Options</title>
-    <style>
-      *,
-      *::before,
-      *::after {
-        box-sizing: border-box;
-      }
-      body {
-        font: 14px/1.4 -apple-system, BlinkMacSystemFont, Segoe UI, Roboto,
-          Inter, Helvetica, Arial, sans-serif;
-        color: #111827;
-        margin: 24px;
-      }
-      .card {
-        background: #fff;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
-        padding: 16px;
-        max-width: 720px;
-      }
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Element Snap - Options</title>
+  <style>
+    :root {
+      --background: oklch(1 0 0);
+      --foreground: oklch(0.145 0 0);
+      --card: oklch(1 0 0);
+      --card-foreground: oklch(0.145 0 0);
+      --primary: oklch(0.488 0.243 264.376);
+      --primary-foreground: oklch(0.97 0.014 254.604);
+      --secondary: oklch(0.967 0.001 286.375);
+      --secondary-foreground: oklch(0.21 0.006 285.885);
+      --muted: oklch(0.97 0 0);
+      --muted-foreground: oklch(0.556 0 0);
+      --accent: oklch(0.97 0 0);
+      --accent-foreground: oklch(0.205 0 0);
+      --destructive: oklch(0.58 0.22 27);
+      --border: oklch(0.922 0 0);
+      --input: oklch(0.922 0 0);
+      --ring: oklch(0.708 0 0);
+      --radius: 0.625rem;
+    }
+
+    .dark {
+      --background: oklch(0.145 0 0);
+      --foreground: oklch(0.985 0 0);
+      --card: oklch(0.205 0 0);
+      --card-foreground: oklch(0.985 0 0);
+      --primary: oklch(0.42 0.18 266);
+      --primary-foreground: oklch(0.97 0.014 254.604);
+      --secondary: oklch(0.274 0.006 286.033);
+      --secondary-foreground: oklch(0.985 0 0);
+      --muted: oklch(0.269 0 0);
+      --muted-foreground: oklch(0.708 0 0);
+      --accent: oklch(0.371 0 0);
+      --accent-foreground: oklch(0.985 0 0);
+      --destructive: oklch(0.704 0.191 22.216);
+      --border: oklch(1 0 0 / 10%);
+      --input: oklch(1 0 0 / 15%);
+      --ring: oklch(0.556 0 0);
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      color-scheme: light;
+    }
+
+    html.dark {
+      color-scheme: dark;
+    }
+
+    body {
+      font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Inter", Helvetica, Arial, sans-serif;
+      color: var(--foreground);
+      background: var(--background);
+      margin: 0;
+      padding: 24px;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 4px 12px rgba(0, 0, 0, 0.04);
+      padding: 20px;
+      max-width: 720px;
+      transition: background-color 0.2s ease, border-color 0.2s ease;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 12px;
+    }
+
+    .row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .slider-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .slider-row input[type="range"] {
+      flex: 1;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--foreground);
+      margin-bottom: 6px;
+    }
+
+    .label-muted {
+      color: var(--muted-foreground);
+      font-weight: 400;
+      font-size: 12px;
+    }
+
+    input[type="text"],
+    select,
+    input[type="color"] {
+      height: 36px;
+      border: 1px solid var(--border);
+      border-radius: calc(var(--radius) - 2px);
+      padding: 0 12px;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      background: var(--card);
+      color: var(--foreground);
+      font-size: 14px;
+      transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+
+    input[type="text"]:focus,
+    select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px oklch(from var(--primary) l c h / 20%);
+    }
+
+    input[type="text"]::placeholder {
+      color: var(--muted-foreground);
+    }
+
+    select {
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 36px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: var(--muted);
+      appearance: none;
+      cursor: pointer;
+      margin: 0;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--primary);
+      border: none;
+      box-shadow: 0 0 0 0 oklch(from var(--primary) l c h / 0%);
+      cursor: pointer;
+      transition: box-shadow 0.2s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      box-shadow: 0 0 0 3px oklch(from var(--primary) l c h / 25%);
+    }
+
+    input[type="range"]:active::-webkit-slider-thumb {
+      box-shadow: 0 0 0 4px oklch(from var(--primary) l c h / 35%);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--primary);
+      border: none;
+      box-shadow: 0 0 0 0 oklch(from var(--primary) l c h / 0%);
+      cursor: pointer;
+      transition: box-shadow 0.2s ease;
+    }
+
+    input[type="range"]::-moz-range-thumb:hover {
+      box-shadow: 0 0 0 3px oklch(from var(--primary) l c h / 25%);
+    }
+
+    input[type="range"]:active::-moz-range-thumb {
+      box-shadow: 0 0 0 4px oklch(from var(--primary) l c h / 35%);
+    }
+
+    input[type="range"]:focus {
+      outline: none;
+    }
+
+    input[type="range"]:focus::-webkit-slider-thumb {
+      box-shadow: 0 0 0 3px oklch(from var(--primary) l c h / 30%);
+    }
+
+    input[type="range"]:focus::-moz-range-thumb {
+      box-shadow: 0 0 0 3px oklch(from var(--primary) l c h / 30%);
+    }
+
+    input[type="color"] {
+      padding: 4px;
+      cursor: pointer;
+      transition: border-color 0.15s ease;
+    }
+
+    input[type="color"]:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px oklch(from var(--primary) l c h / 20%);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 36px;
+      padding: 0 16px;
+      border-radius: calc(var(--radius) - 2px);
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--foreground);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .btn:hover {
+      background: var(--accent);
+      border-color: var(--border);
+    }
+
+    .btn.primary {
+      background: var(--primary);
+      color: var(--primary-foreground);
+      border-color: var(--primary);
+    }
+
+    .btn.primary:hover {
+      opacity: 0.9;
+    }
+
+    .btn.ghost {
+      background: transparent;
+      border-color: transparent;
+    }
+
+    .btn.ghost:hover {
+      background: var(--accent);
+    }
+
+    .muted {
+      color: var(--muted-foreground);
+      font-size: 13px;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 600;
+      margin: 0 0 20px;
+      color: var(--foreground);
+    }
+
+    .section {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .section:first-of-type {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--foreground);
+    }
+
+    .val-input {
+      width: 60px;
+      height: 32px;
+      padding: 0 8px;
+      border: 1px solid var(--border);
+      border-radius: calc(var(--radius) - 2px);
+      background: var(--card);
+      color: var(--foreground);
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .val-input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px oklch(from var(--primary) l c h / 20%);
+    }
+
+    .theme-toggle {
+      display: flex;
+      gap: 4px;
+      background: var(--muted);
+      padding: 4px;
+      border-radius: var(--radius);
+    }
+
+    .theme-toggle .btn {
+      height: 32px;
+      padding: 0 14px;
+      border: none;
+      background: transparent;
+      color: var(--muted-foreground);
+      font-size: 13px;
+    }
+
+    .theme-toggle .btn.active {
+      background: var(--card);
+      color: var(--foreground);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    }
+
+    @media (max-width: 720px) {
       .grid-2 {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
+        grid-template-columns: 1fr;
       }
+
       .grid-4 {
-        display: grid;
-        grid-template-columns: 1fr 1fr 1fr 1fr;
-        gap: 12px;
+        grid-template-columns: 1fr 1fr;
       }
-      .row {
-        display: flex;
-        gap: 10px;
-        align-items: center;
-      }
-      label {
-        display: block;
-        font-size: 12px;
-        color: #4b5563;
-        margin-bottom: 4px;
-      }
-      input[type="text"],
-      select,
-      input[type="color"] {
-        height: 32px;
-        border: 1px solid #e5e7eb;
-        border-radius: 6px;
-        padding: 0 10px;
-        width: 100%;
-        max-width: 100%;
-        min-width: 0;
-        background: #fff;
-      }
-      input[type="range"] {
-        width: 100%;
-      }
-      .btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        height: 32px;
-        padding: 0 12px;
-        border-radius: 6px;
-        border: 1px solid #e5e7eb;
-        background: #f9fafb;
-        cursor: pointer;
-      }
-      .btn.primary {
-        background: #4f46e5;
-        color: #fff;
-        border-color: #4f46e5;
-      }
-      .muted {
-        color: #6b7280;
-        font-size: 12px;
-      }
-      h1 {
-        font-size: 18px;
-        margin: 0 0 12px;
-      }
-      .section {
-        margin-top: 16px;
-      }
-      .val {
-        display: inline-block;
-        min-width: 36px;
-        text-align: right;
-        color: #6b7280;
-        font-size: 12px;
-      }
-      @media (max-width: 720px) {
-        .grid-2 {
-          grid-template-columns: 1fr;
-        }
-        .grid-4 {
-          grid-template-columns: 1fr 1fr;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <div class="card">
-      <h1>Element Snap - Options</h1>
+    }
+  </style>
+</head>
 
-      <div class="section grid-2">
-        <div>
-          <label>Padding Mode</label>
-          <select id="opt-mode">
-            <option value="uniform">Uniform</option>
-            <option value="sides">Per side</option>
-          </select>
-        </div>
-        <div>
-          <label>Filename Prefix</label>
-          <input id="opt-name" type="text" placeholder="element-screenshot" />
+<body>
+  <div class="card">
+    <h1>Element Snap - Options</h1>
+
+    <div class="section">
+      <div class="section-title">Appearance</div>
+      <div class="theme-toggle">
+        <button class="btn" id="opt-theme-light">Light</button>
+        <button class="btn" id="opt-theme-dark">Dark</button>
+        <button class="btn" id="opt-theme-system">System</button>
+      </div>
+    </div>
+
+    <div class="section grid-2">
+      <div>
+        <label>Padding Mode</label>
+        <select id="opt-mode">
+          <option value="uniform">Uniform</option>
+          <option value="sides">Per side</option>
+        </select>
+      </div>
+      <div>
+        <label>Filename Prefix</label>
+        <input id="opt-name" type="text" placeholder="element-screenshot" />
+      </div>
+    </div>
+
+    <div class="section grid-2">
+      <div>
+        <label>Padding (Uniform)</label>
+        <div class="slider-row">
+          <input id="opt-pad" type="range" min="0" max="50" step="1" />
+          <input type="number" class="val-input" id="lbl-pad" min="0" max="50" value="0" />px
         </div>
       </div>
-
-      <div class="section grid-2">
-        <div>
-          <label>Padding (Uniform)</label>
-          <div class="row">
-            <input id="opt-pad" type="range" min="0" max="50" step="1" />
-            <span class="val" id="lbl-pad">0px</span>
-          </div>
-        </div>
-        <div>
-          <label>Capture Margin</label>
-          <div class="row">
-            <input id="opt-cm" type="range" min="0" max="200" step="2" />
-            <span class="val" id="lbl-cm">0px</span>
-          </div>
-        </div>
-      </div>
-
-      <div id="section-sides" class="section" style="display: none">
-        <label>Padding (Per Side)</label>
-        <div class="grid-4">
-          <div>
-            <label>Top</label>
-            <div class="row">
-              <input id="opt-pt" type="range" min="0" max="50" step="1" />
-              <span class="val" id="lbl-pt">0px</span>
-            </div>
-          </div>
-          <div>
-            <label>Right</label>
-            <div class="row">
-              <input id="opt-pr" type="range" min="0" max="50" step="1" />
-              <span class="val" id="lbl-pr">0px</span>
-            </div>
-          </div>
-          <div>
-            <label>Bottom</label>
-            <div class="row">
-              <input id="opt-pb" type="range" min="0" max="50" step="1" />
-              <span class="val" id="lbl-pb">0px</span>
-            </div>
-          </div>
-          <div>
-            <label>Left</label>
-            <div class="row">
-              <input id="opt-pl" type="range" min="0" max="50" step="1" />
-              <span class="val" id="lbl-pl">0px</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="section grid-2">
-        <div>
-          <label>Padding Color</label>
-          <input id="opt-color" type="color" />
-        </div>
-        <div>
-          <label>Padding Type</label>
-          <select id="opt-ptype">
-            <option value="transparent">Transparent</option>
-            <option value="colored">Colored</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="section grid-2">
-        <div>
-          <label>Rounded Corners</label>
-          <div class="row">
-            <input id="opt-r" type="range" min="0" max="48" step="1" />
-            <span class="val" id="lbl-r">0px</span>
-          </div>
-        </div>
-        <div>
-          <label>Format</label>
-          <select id="opt-format">
-            <option value="png">PNG</option>
-            <option value="webp">WEBP</option>
-            <option value="jpg">JPG</option>
-            <option value="svg">SVG</option>
-          </select>
-        </div>
-      </div>
-
-      <div id="section-quality" class="section" style="display: none">
-        <label>Quality</label>
-        <div class="row">
-          <input id="opt-q" type="range" min="10" max="100" step="5" />
-          <span class="val" id="lbl-q">90%</span>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="row">
-          <button class="btn" id="btn-reset">Reset</button>
-          <button class="btn primary" id="btn-save">Save</button>
-          <span class="muted" id="status" aria-live="polite"></span>
+      <div>
+        <label>Capture Margin</label>
+        <div class="slider-row">
+          <input id="opt-cm" type="range" min="0" max="200" step="2" />
+          <input type="number" class="val-input" id="lbl-cm" min="0" max="200" value="0" />px
         </div>
       </div>
     </div>
 
-    <script src="shared.js"></script>
-    <script src="options.js"></script>
-  </body>
+    <div id="section-sides" class="section" style="display: none">
+      <label>Padding (Per Side)</label>
+      <div class="grid-4">
+        <div>
+          <label class="label-muted">Top</label>
+          <div class="slider-row">
+            <input id="opt-pt" type="range" min="0" max="50" step="1" />
+            <input type="number" class="val-input" id="lbl-pt" min="0" max="50" value="0" />px
+          </div>
+        </div>
+        <div>
+          <label class="label-muted">Right</label>
+          <div class="slider-row">
+            <input id="opt-pr" type="range" min="0" max="50" step="1" />
+            <input type="number" class="val-input" id="lbl-pr" min="0" max="50" value="0" />px
+          </div>
+        </div>
+        <div>
+          <label class="label-muted">Bottom</label>
+          <div class="slider-row">
+            <input id="opt-pb" type="range" min="0" max="50" step="1" />
+            <input type="number" class="val-input" id="lbl-pb" min="0" max="50" value="0" />px
+          </div>
+        </div>
+        <div>
+          <label class="label-muted">Left</label>
+          <div class="slider-row">
+            <input id="opt-pl" type="range" min="0" max="50" step="1" />
+            <input type="number" class="val-input" id="lbl-pl" min="0" max="50" value="0" />px
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section grid-2">
+      <div>
+        <label>Padding Color</label>
+        <input id="opt-color" type="color" />
+      </div>
+      <div>
+        <label>Padding Type</label>
+        <select id="opt-ptype">
+          <option value="transparent">Transparent</option>
+          <option value="colored">Colored</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="section grid-2">
+      <div>
+        <label>Rounded Corners</label>
+        <div class="slider-row">
+          <input id="opt-r" type="range" min="0" max="48" step="1" />
+          <input type="number" class="val-input" id="lbl-r" min="0" max="48" value="0" />px
+        </div>
+      </div>
+      <div>
+        <label>Format</label>
+        <select id="opt-format">
+          <option value="png">PNG</option>
+          <option value="webp">WEBP</option>
+          <option value="jpg">JPG</option>
+          <option value="svg">SVG</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="section-quality" class="section" style="display: none">
+      <label>Quality</label>
+      <div class="slider-row">
+        <input id="opt-q" type="range" min="10" max="100" step="5" />
+        <input type="number" class="val-input" id="lbl-q" min="10" max="100" value="90" />%
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="row">
+        <button class="btn" id="btn-reset">Reset</button>
+        <button class="btn primary" id="btn-save">Save</button>
+        <span class="muted" id="status" aria-live="polite" style="margin-left: auto"></span>
+      </div>
+    </div>
+  </div>
+
+  <script src="shared.js"></script>
+  <script src="options.js"></script>
+</body>
+
 </html>
