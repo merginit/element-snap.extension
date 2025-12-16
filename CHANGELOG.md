@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.2] - 2025-12-16
+- Auto-close extension UI when navigating to a new page
+- Background script now deactivates on tab navigation (selected element doesn't exist on new page)
+- Add state sync polling to clean up orphaned UI elements
+
 ## [0.2.1] - 2025-12-16
 - Fix inner paths losing rounded corners at certain padding/margin sizes when squircle mode enabled
 - Add guards to gracefully fall back to standard rounded corners when squircle parameters become degenerate

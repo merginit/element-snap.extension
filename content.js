@@ -37,6 +37,42 @@ let patternTile = null;
 let clickSuppressTimer = null;
 let clickSuppressHandler = null;
 let panelState = null; // tracks { mode, format, paddingType, isAlpha } to avoid unnecessary rebuilds
+let lastKnownUrl = null; // for detecting URL changes
+let stateSyncInterval = null;
+
+// Sync state with background script - background's badge state is the source of truth
+function startStateSync() {
+  if (stateSyncInterval) return;
+  stateSyncInterval = setInterval(() => {
+    // Check if we have UI elements but background says we're not active
+    const hasUI = !!document.getElementById("es-host");
+    if (!hasUI) return; // No UI, nothing to sync
+
+    chrome.runtime.sendMessage({ type: "GET_ACTIVE" }, (res) => {
+      if (chrome.runtime.lastError) return; // Extension context invalidated
+      if (!res?.active && hasUI) {
+        // Force cleanup
+        const hostEl = document.getElementById("es-host");
+        if (hostEl) hostEl.remove();
+        ACTIVE = false;
+        LOCKED = false;
+        host = null;
+        shadowRoot = null;
+        panel = null;
+        overlay = null;
+      }
+    });
+  }, 500);
+}
+
+function stopStateSync() {
+  if (stateSyncInterval) {
+    clearInterval(stateSyncInterval);
+    stateSyncInterval = null;
+  }
+}
+
+startStateSync();
 
 function getPatternTile() {
   if (!patternTile) {
@@ -460,25 +496,29 @@ function ensureOverlay() {
 
 function removeOverlay() {
   if (panel) {
-    panel.remove();
+    try { panel.remove(); } catch (_) { }
     panel = null;
     panelState = null;
   }
   if (overlay) {
-    overlay.remove();
+    try { overlay.remove(); } catch (_) { }
     overlay = null;
     box = null;
     padMask = null;
     padTop = padRight = padBottom = padLeft = null;
+    padCanvas = null;
+    padCtx = null;
   }
   if (host) {
-    try {
-      host.remove();
-    } catch (err) {
-      console.warn("Element Snap: failed to remove host", err);
-    }
+    try { host.remove(); } catch (_) { }
     host = null;
     shadowRoot = null;
+  }
+
+  // Fallback: directly query and remove #es-host in case our reference is stale
+  const existingHost = document.getElementById("es-host");
+  if (existingHost) {
+    try { existingHost.remove(); } catch (_) { }
   }
 }
 
@@ -2400,6 +2440,36 @@ function createImageFromDataURL(dataUrl) {
   });
 }
 
+function onUrlChange() {
+  // Close extension when URL changes - the selected element doesn't exist on the new page
+  if (ACTIVE && lastKnownUrl && location.href !== lastKnownUrl) {
+    disable();
+    chrome.runtime.sendMessage({ type: "SET_ACTIVE", active: false }).catch(() => { });
+  }
+}
+
+// Wrap History API to detect SPA navigations (pushState/replaceState don't trigger popstate)
+let historyWrapped = false;
+function wrapHistoryApi() {
+  if (historyWrapped) return;
+  historyWrapped = true;
+
+  const originalPushState = history.pushState;
+  const originalReplaceState = history.replaceState;
+
+  history.pushState = function (...args) {
+    const result = originalPushState.apply(this, args);
+    onUrlChange();
+    return result;
+  };
+
+  history.replaceState = function (...args) {
+    const result = originalReplaceState.apply(this, args);
+    onUrlChange();
+    return result;
+  };
+}
+
 function onToggleMessage(active) {
   if (active) enable();
   else disable();
@@ -2407,6 +2477,8 @@ function onToggleMessage(active) {
 
 async function enable() {
   ACTIVE = true;
+  lastKnownUrl = location.href;
+  wrapHistoryApi(); // Intercept History API for SPA navigation detection
   await loadSettings();
   ensureOverlay();
   window.addEventListener("mousemove", onMouseMove, {
@@ -2421,11 +2493,16 @@ async function enable() {
     passive: true,
   });
   window.addEventListener("resize", onResize);
+  window.addEventListener("popstate", onUrlChange);
+  window.addEventListener("hashchange", onUrlChange);
 }
 
 function disable() {
   ACTIVE = false;
   LOCKED = false;
+  lastKnownUrl = null;
+  currentTarget = null;
+  currentRect = null;
   cleanupClickSuppression();
   window.removeEventListener("mousemove", onMouseMove, { capture: true });
   window.removeEventListener("mousedown", onMouseDown, { capture: true });
@@ -2433,6 +2510,8 @@ function disable() {
   window.removeEventListener("scroll", onScroll, { capture: true });
   document.removeEventListener("scroll", onScroll, { capture: true });
   window.removeEventListener("resize", onResize);
+  window.removeEventListener("popstate", onUrlChange);
+  window.removeEventListener("hashchange", onUrlChange);
   removeOverlay();
 }
 

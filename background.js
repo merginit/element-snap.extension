@@ -156,14 +156,12 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   tabStates.delete(tabId);
 });
 
+// Deactivate extension when tab navigates - the selected element doesn't exist on new page
 chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
   if (info.status === "complete" && tabStates.get(tabId)?.active) {
-    const ok = await ensureInjected(tabId);
-    if (ok) {
-      try {
-        await chrome.tabs.sendMessage(tabId, { type: "TOGGLE", active: true });
-      } catch (_) { }
-    }
+    // Deactivate on navigation instead of re-activating
+    tabStates.set(tabId, { active: false });
+    setActiveBadge(tabId, false);
   }
 });
 
