@@ -11,7 +11,13 @@
     </span>
 </div>
 
-![Element Snap Preview](./assets/preview.png)
+<div align="center">
+  <img src="./assets/extension-light.png" alt="Extension Light" width="45%" />
+  <img src="./assets/extension-dark.png" alt="Extension Dark" width="45%" />
+  <br/>
+  <img src="./assets/options-light.png" alt="Options Light" width="45%" />
+  <img src="./assets/options-dark.png" alt="Options Dark" width="45%" />
+</div>
 
 ## Why Element Snap?
 
