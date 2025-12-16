@@ -48,20 +48,32 @@ function startStateSync() {
     const hasUI = !!document.getElementById("es-host");
     if (!hasUI) return; // No UI, nothing to sync
 
-    chrome.runtime.sendMessage({ type: "GET_ACTIVE" }, (res) => {
-      if (chrome.runtime.lastError) return; // Extension context invalidated
-      if (!res?.active && hasUI) {
-        // Force cleanup
-        const hostEl = document.getElementById("es-host");
-        if (hostEl) hostEl.remove();
-        ACTIVE = false;
-        LOCKED = false;
-        host = null;
-        shadowRoot = null;
-        panel = null;
-        overlay = null;
-      }
-    });
+    try {
+      chrome.runtime.sendMessage({ type: "GET_ACTIVE" }, (res) => {
+        if (chrome.runtime.lastError) {
+          // Extension context invalidated (extension reloaded/updated)
+          stopStateSync();
+          // Clean up any orphaned UI
+          const hostEl = document.getElementById("es-host");
+          if (hostEl) hostEl.remove();
+          return;
+        }
+        if (!res?.active && hasUI) {
+          // Force cleanup
+          const hostEl = document.getElementById("es-host");
+          if (hostEl) hostEl.remove();
+          ACTIVE = false;
+          LOCKED = false;
+          host = null;
+          shadowRoot = null;
+          panel = null;
+          overlay = null;
+        }
+      });
+    } catch (_) {
+      // Extension context invalidated
+      stopStateSync();
+    }
   }, 500);
 }
 

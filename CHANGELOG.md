@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.3] - 2025-12-16
+- Fix "Extension context invalidated" error spam when extension is reloaded
+- State sync interval now stops itself when extension context is lost
+
 ## [0.2.2] - 2025-12-16
 - Auto-close extension UI when navigating to a new page
 - Background script now deactivates on tab navigation (selected element doesn't exist on new page)
