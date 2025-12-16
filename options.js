@@ -74,8 +74,14 @@ function load() {
     document.getElementById("lbl-pb").value = s.paddingSides.bottom;
     document.getElementById("lbl-pl").value = s.paddingSides.left;
 
+    // Squircle settings
+    document.getElementById("opt-squircle").checked = s.squircleRounding;
+    document.getElementById("opt-smooth").value = Math.round(s.cornerSmoothing * 100);
+    document.getElementById("lbl-smooth").value = Math.round(s.cornerSmoothing * 100);
+
     toggleModeSections(s.paddingMode);
     toggleQualitySection(s.format);
+    toggleSmoothingSection(s.squircleRounding);
   });
 }
 
@@ -89,6 +95,8 @@ function save() {
   prefs.paddingColor = document.getElementById("opt-color").value;
   prefs.paddingType = document.getElementById("opt-ptype").value;
   prefs.roundedRadius = Number(document.getElementById("opt-r").value) || 0;
+  prefs.squircleRounding = document.getElementById("opt-squircle").checked;
+  prefs.cornerSmoothing = (Number(document.getElementById("opt-smooth").value) || 60) / 100;
   prefs.format = document.getElementById("opt-format").value;
   prefs.quality = Number(document.getElementById("opt-q").value) || 90;
   if (prefs.paddingMode === "uniform") {
@@ -129,6 +137,14 @@ function resetDefaults() {
 document.addEventListener("DOMContentLoaded", () => {
   load();
 
+  // Listen for settings changes from content script/popup for bidirectional sync
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "sync" && changes.elementShotPrefs) {
+      // Re-load all settings to reflect changes from other sources
+      load();
+    }
+  });
+
   document.getElementById("opt-theme-light").addEventListener("click", () => {
     applyTheme("light");
   });
@@ -158,6 +174,10 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   document.getElementById("opt-format").addEventListener("change", (e) => {
     toggleQualitySection(e.target.value);
+  });
+
+  document.getElementById("opt-squircle").addEventListener("change", (e) => {
+    toggleSmoothingSection(e.target.checked);
   });
 
   // Bidirectional binding between range sliders and number inputs
@@ -193,6 +213,7 @@ document.addEventListener("DOMContentLoaded", () => {
   bindSlider("opt-pb", "lbl-pb");
   bindSlider("opt-pl", "lbl-pl");
   bindSlider("opt-q", "lbl-q");
+  bindSlider("opt-smooth", "lbl-smooth");
 });
 
 function toggleModeSections(mode) {
@@ -205,6 +226,12 @@ function toggleModeSections(mode) {
 function toggleQualitySection(fmt) {
   const lossy = fmt === "jpg" || fmt === "webp";
   document.getElementById("section-quality").style.display = lossy
+    ? "block"
+    : "none";
+}
+
+function toggleSmoothingSection(enabled) {
+  document.getElementById("section-smoothing").style.display = enabled
     ? "block"
     : "none";
 }

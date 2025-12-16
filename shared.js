@@ -29,6 +29,8 @@ const DEFAULTS = {
   filenamePrefix: "element-screenshot",
   panelOpacityLow: false,
   roundedRadius: 0,
+  squircleRounding: false, // Use Figma-style smooth corners
+  cornerSmoothing: 0.6, // 0-1, controls curve smoothness (0.6 = Apple-like)
 };
 
 function migrateSettings(prefs) {
@@ -54,5 +56,7 @@ function migrateSettings(prefs) {
   out.captureMargin = Number(prefs.captureMargin ?? 0) || 0;
   out.panelOpacityLow = !!prefs.panelOpacityLow;
   out.roundedRadius = Math.max(0, Number(prefs.roundedRadius ?? 0) || 0);
+  out.squircleRounding = !!prefs.squircleRounding;
+  out.cornerSmoothing = Math.max(0, Math.min(1, Number(prefs.cornerSmoothing ?? 0.6) || 0.6));
   return out;
 }

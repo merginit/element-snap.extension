@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.27] - 2025-12-16
+- Add optional squircle (smooth corners) rounding mode based on Figma's corner smoothing algorithm
+- New "Smooth corners" checkbox in both settings panel and options page
+- Adjustable corner smoothing slider (0-100%) when squircle mode is enabled
+- Smoother, more iOS/macOS-like corners compared to standard CSS border-radius
+- Fix options page changes not immediately updating the live preview
+
 ## [0.1.26] - 2025-12-16
 - Fix extension showing "active" status on restricted pages where content scripts cannot run
 - Add rigorous 4-layer URL restriction detection:

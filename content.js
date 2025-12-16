@@ -337,6 +337,51 @@ const STYLE = css`
   #es-panel strong {
     color: var(--es-card-foreground);
   }
+  #es-panel .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+  }
+  #es-panel .checkbox-label input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  #es-panel .checkbox-custom {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--es-border);
+    border-radius: 4px;
+    background: var(--es-card);
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+  }
+  #es-panel .checkbox-label input[type="checkbox"]:checked + .checkbox-custom {
+    background: var(--es-primary);
+    border-color: var(--es-primary);
+  }
+  #es-panel .checkbox-custom::after {
+    content: '';
+    display: none;
+    width: 4px;
+    height: 8px;
+    border: solid var(--es-primary-foreground);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+    margin-bottom: 2px;
+  }
+  #es-panel .checkbox-label input[type="checkbox"]:checked + .checkbox-custom::after {
+    display: block;
+  }
+  #es-panel .checkbox-label input[type="checkbox"]:focus + .checkbox-custom {
+    box-shadow: 0 0 0 2px oklch(from var(--es-primary) l c h / 25%);
+  }
 `;
 
 function ensureHost() {
@@ -463,13 +508,24 @@ function applyHostTheme() {
   host.classList.toggle("dark", effective === "dark");
 }
 
-// Listen for theme changes from options page
+// Listen for settings changes from options page
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "sync" && changes.elementShotPrefs) {
-    const newPrefs = changes.elementShotPrefs.newValue;
-    if (newPrefs && newPrefs.theme !== settings.theme) {
-      settings.theme = newPrefs.theme;
+    const newPrefs = migrateSettings(changes.elementShotPrefs.newValue || DEFAULTS);
+    const themeChanged = newPrefs.theme !== settings.theme;
+
+    // Update all settings
+    settings = newPrefs;
+
+    // Apply theme if changed
+    if (themeChanged) {
       applyHostTheme();
+    }
+
+    // Re-render the preview if the extension is active
+    if (ACTIVE && currentRect) {
+      positionUI(currentRect);
+      renderPanel();
     }
   }
 });
@@ -721,6 +777,8 @@ function setPadPreview(rect) {
     const marginRect = { x: base.x, y: base.y, w: base.width, h: base.height };
     const contentRect = { x: rect.x, y: rect.y, w: rect.width, h: rect.height };
     const rr = Math.max(0, Number(settings.roundedRadius) || 0);
+    const useSquircle = !!settings.squircleRounding;
+    const smoothing = Math.max(0, Math.min(1, Number(settings.cornerSmoothing) || 0.6));
     const rOuter = Math.min(rr, Math.floor(Math.min(outer.w, outer.h) / 2));
     const rMargin = Math.min(
       rr,
@@ -734,14 +792,16 @@ function setPadPreview(rect) {
     // 1) Padding band: outer(rounded) - margin(rounded)
     if (pads.l + pads.r + pads.t + pads.b > 0) {
       padCtx.beginPath();
-      roundRectPath(padCtx, outer.x, outer.y, outer.w, outer.h, rOuter);
-      roundRectPath(
+      smartRectPath(padCtx, outer.x, outer.y, outer.w, outer.h, rOuter, useSquircle, smoothing);
+      smartRectPath(
         padCtx,
         marginRect.x,
         marginRect.y,
         marginRect.w,
         marginRect.h,
-        rMargin
+        rMargin,
+        useSquircle,
+        smoothing
       );
       if (useColor) {
         padCtx.fillStyle = settings.paddingColor;
@@ -754,21 +814,25 @@ function setPadPreview(rect) {
     // 2) Capture margin band: margin(rounded) - content(rounded)
     if (m > 0) {
       padCtx.beginPath();
-      roundRectPath(
+      smartRectPath(
         padCtx,
         marginRect.x,
         marginRect.y,
         marginRect.w,
         marginRect.h,
-        rMargin
+        rMargin,
+        useSquircle,
+        smoothing
       );
-      roundRectPath(
+      smartRectPath(
         padCtx,
         contentRect.x,
         contentRect.y,
         contentRect.w,
         contentRect.h,
-        rContent
+        rContent,
+        useSquircle,
+        smoothing
       );
       padCtx.fillStyle = padCtx.createPattern(getPatternTile(), "repeat");
       padCtx.fill("evenodd");
@@ -896,6 +960,262 @@ function roundRectPath(ctx, x, y, w, h, r) {
   ctx.arcTo(x, y + h, x, y, r);
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
+}
+
+// Squircle (Figma-style smooth corners) implementation
+// Based on: https://www.figma.com/blog/desperately-seeking-squircles
+// Ported from: https://github.com/phamfoo/figma-squircle
+
+function toRadians(degrees) {
+  return (degrees * Math.PI) / 180;
+}
+
+/**
+ * Calculate path parameters for a corner based on Figma's algorithm.
+ */
+function getPathParamsForCorner(cornerRadius, cornerSmoothing, roundingAndSmoothingBudget) {
+  let p = (1 + cornerSmoothing) * cornerRadius;
+
+  const maxCornerSmoothing = roundingAndSmoothingBudget / cornerRadius - 1;
+  cornerSmoothing = Math.min(cornerSmoothing, maxCornerSmoothing);
+  p = Math.min(p, roundingAndSmoothingBudget);
+
+  const arcMeasure = 90 * (1 - cornerSmoothing);
+  const arcSectionLength = Math.sin(toRadians(arcMeasure / 2)) * cornerRadius * Math.sqrt(2);
+
+  const angleAlpha = (90 - arcMeasure) / 2;
+  const p3ToP4Distance = cornerRadius * Math.tan(toRadians(angleAlpha / 2));
+
+  const angleBeta = 45 * cornerSmoothing;
+  const c = p3ToP4Distance * Math.cos(toRadians(angleBeta));
+  const d = c * Math.tan(toRadians(angleBeta));
+
+  let b = (p - arcSectionLength - c - d) / 3;
+  let a = 2 * b;
+
+  return { a, b, c, d, p, arcSectionLength, cornerRadius };
+}
+
+/**
+ * Generate SVG path string for a squircle rectangle.
+ * Returns the SVG path data string that can be used with Path2D.
+ */
+function getSquircleSvgPath(x, y, w, h, r, cornerSmoothing) {
+  const roundingAndSmoothingBudget = Math.min(w, h) / 2;
+  const cornerRadius = Math.min(r, roundingAndSmoothingBudget);
+  const params = getPathParamsForCorner(cornerRadius, cornerSmoothing, roundingAndSmoothingBudget);
+  const { a, b, c, d, p, arcSectionLength } = params;
+  const R = params.cornerRadius;
+
+  const n = (val) => val.toFixed(4);
+
+  // Build SVG path string
+  // Starting point: top edge, after top-left corner area
+  let path = `M ${n(x + p)} ${n(y)}`;
+
+  // Line to top-right corner start
+  path += ` L ${n(x + w - p)} ${n(y)}`;
+
+  // === TOP-RIGHT CORNER ===
+  path += ` c ${n(a)} 0 ${n(a + b)} 0 ${n(a + b + c)} ${n(d)}`;
+  path += ` a ${n(R)} ${n(R)} 0 0 1 ${n(arcSectionLength)} ${n(arcSectionLength)}`;
+  path += ` c ${n(d)} ${n(c)} ${n(d)} ${n(b + c)} ${n(d)} ${n(a + b + c)}`;
+
+  // Line down right edge to bottom-right corner
+  path += ` L ${n(x + w)} ${n(y + h - p)}`;
+
+  // === BOTTOM-RIGHT CORNER ===
+  path += ` c 0 ${n(a)} 0 ${n(a + b)} ${n(-d)} ${n(a + b + c)}`;
+  path += ` a ${n(R)} ${n(R)} 0 0 1 ${n(-arcSectionLength)} ${n(arcSectionLength)}`;
+  path += ` c ${n(-c)} ${n(d)} ${n(-(b + c))} ${n(d)} ${n(-(a + b + c))} ${n(d)}`;
+
+  // Line along bottom edge to bottom-left corner
+  path += ` L ${n(x + p)} ${n(y + h)}`;
+
+  // === BOTTOM-LEFT CORNER ===
+  path += ` c ${n(-a)} 0 ${n(-(a + b))} 0 ${n(-(a + b + c))} ${n(-d)}`;
+  path += ` a ${n(R)} ${n(R)} 0 0 1 ${n(-arcSectionLength)} ${n(-arcSectionLength)}`;
+  path += ` c ${n(-d)} ${n(-c)} ${n(-d)} ${n(-(b + c))} ${n(-d)} ${n(-(a + b + c))}`;
+
+  // Line up left edge to top-left corner
+  path += ` L ${n(x)} ${n(y + p)}`;
+
+  // === TOP-LEFT CORNER ===
+  path += ` c 0 ${n(-a)} 0 ${n(-(a + b))} ${n(d)} ${n(-(a + b + c))}`;
+  path += ` a ${n(R)} ${n(R)} 0 0 1 ${n(arcSectionLength)} ${n(-arcSectionLength)}`;
+  path += ` c ${n(c)} ${n(-d)} ${n(b + c)} ${n(-d)} ${n(a + b + c)} ${n(-d)}`;
+
+  path += ' Z';
+
+  return path;
+}
+
+function squircleRectPath(ctx, x, y, w, h, r, cornerSmoothing) {
+  if (r <= 0 || cornerSmoothing <= 0) {
+    roundRectPath(ctx, x, y, w, h, r);
+    return;
+  }
+
+  const roundingAndSmoothingBudget = Math.min(w, h) / 2;
+  const cornerRadius = Math.min(r, roundingAndSmoothingBudget);
+  const params = getPathParamsForCorner(cornerRadius, cornerSmoothing, roundingAndSmoothingBudget);
+  const { a, b, c, d, p, arcSectionLength } = params;
+  const R = params.cornerRadius;
+
+  // For bezier arc approximation: k = (4/3) * tan(θ/4)
+  // where θ is the arc sweep angle
+  const effectiveSmoothing = Math.min(cornerSmoothing, roundingAndSmoothingBudget / cornerRadius - 1);
+  const arcMeasure = 90 * (1 - effectiveSmoothing);
+  const arcAngleRad = toRadians(arcMeasure);
+  const kappa = (4 / 3) * Math.tan(arcAngleRad / 4);
+
+  // The key insight: the arc connects smoothly between two bezier curves
+  // First bezier ends with tangent direction proportional to (c, d) - normalized
+  // Second bezier starts with tangent direction proportional to (d, c) - normalized
+  // The arc's control points go in these tangent directions at distance kappa * R
+
+  // Normalize the tangent vectors
+  const mag1 = Math.sqrt(c * c + d * d);
+  const mag2 = Math.sqrt(d * d + c * c); // same as mag1
+  const t1x = c / mag1; // start tangent x component (for top-right)
+  const t1y = d / mag1; // start tangent y component
+  const t2x = d / mag2; // end tangent x component  
+  const t2y = c / mag2; // end tangent y component
+
+  const ctrlDist = kappa * R;
+
+  // Start at top edge
+  ctx.moveTo(x + p, y);
+
+  // Top edge to top-right
+  ctx.lineTo(x + w - p, y);
+
+  // === TOP-RIGHT CORNER ===
+  let cx = x + w - p;
+  let cy = y;
+
+  // First bezier: transition into corner
+  ctx.bezierCurveTo(cx + a, cy, cx + a + b, cy, cx + a + b + c, cy + d);
+  cx += a + b + c;
+  cy += d;
+
+  // Arc: from (cx, cy) to (cx + arcSectionLength, cy + arcSectionLength)
+  // Start tangent: (t1x, t1y) = (c, d) normalized, pointing toward +x, +y
+  // End tangent: (t2x, t2y) = (d, c) normalized, pointing toward +x, +y
+  // Control points: cp1 = start + ctrlDist * start_tangent
+  //                 cp2 = end - ctrlDist * end_tangent
+  {
+    const cp1x = cx + ctrlDist * t1x;
+    const cp1y = cy + ctrlDist * t1y;
+    const endX = cx + arcSectionLength;
+    const endY = cy + arcSectionLength;
+    const cp2x = endX - ctrlDist * t2x;
+    const cp2y = endY - ctrlDist * t2y;
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY);
+    cx = endX;
+    cy = endY;
+  }
+
+  // Second bezier: transition out of corner
+  ctx.bezierCurveTo(cx + d, cy + c, cx + d, cy + b + c, cx + d, cy + a + b + c);
+  cx += d;
+  cy += a + b + c;
+
+  // Right edge to bottom-right
+  ctx.lineTo(x + w, y + h - p);
+  cx = x + w;
+  cy = y + h - p;
+
+  // === BOTTOM-RIGHT CORNER ===
+  ctx.bezierCurveTo(cx, cy + a, cx, cy + a + b, cx - d, cy + a + b + c);
+  cx -= d;
+  cy += a + b + c;
+
+  // Arc: from (cx, cy) to (cx - arcSectionLength, cy + arcSectionLength)
+  // Start tangent: (-d, c) normalized (rotating 90° from top-right case)
+  // End tangent: (-c, d) normalized
+  {
+    const cp1x = cx + ctrlDist * (-t2x);
+    const cp1y = cy + ctrlDist * t2y;
+    const endX = cx - arcSectionLength;
+    const endY = cy + arcSectionLength;
+    const cp2x = endX - ctrlDist * (-t1x);
+    const cp2y = endY - ctrlDist * t1y;
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY);
+    cx = endX;
+    cy = endY;
+  }
+
+  ctx.bezierCurveTo(cx - c, cy + d, cx - b - c, cy + d, cx - a - b - c, cy + d);
+  cx -= a + b + c;
+  cy += d;
+
+  // Bottom edge to bottom-left
+  ctx.lineTo(x + p, y + h);
+  cx = x + p;
+  cy = y + h;
+
+  // === BOTTOM-LEFT CORNER ===
+  ctx.bezierCurveTo(cx - a, cy, cx - a - b, cy, cx - a - b - c, cy - d);
+  cx -= a + b + c;
+  cy -= d;
+
+  // Arc: from (cx, cy) to (cx - arcSectionLength, cy - arcSectionLength)
+  // Start tangent: (-c, -d) normalized (rotating 180° from top-right case)
+  // End tangent: (-d, -c) normalized
+  {
+    const cp1x = cx + ctrlDist * (-t1x);
+    const cp1y = cy + ctrlDist * (-t1y);
+    const endX = cx - arcSectionLength;
+    const endY = cy - arcSectionLength;
+    const cp2x = endX - ctrlDist * (-t2x);
+    const cp2y = endY - ctrlDist * (-t2y);
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY);
+    cx = endX;
+    cy = endY;
+  }
+
+  ctx.bezierCurveTo(cx - d, cy - c, cx - d, cy - b - c, cx - d, cy - a - b - c);
+  cx -= d;
+  cy -= a + b + c;
+
+  // Left edge to top-left
+  ctx.lineTo(x, y + p);
+  cx = x;
+  cy = y + p;
+
+  // === TOP-LEFT CORNER ===
+  ctx.bezierCurveTo(cx, cy - a, cx, cy - a - b, cx + d, cy - a - b - c);
+  cx += d;
+  cy -= a + b + c;
+
+  // Arc: from (cx, cy) to (cx + arcSectionLength, cy - arcSectionLength)
+  // Start tangent: (d, -c) normalized (rotating 270° from top-right case)
+  // End tangent: (c, -d) normalized
+  {
+    const cp1x = cx + ctrlDist * t2x;
+    const cp1y = cy + ctrlDist * (-t2y);
+    const endX = cx + arcSectionLength;
+    const endY = cy - arcSectionLength;
+    const cp2x = endX - ctrlDist * t1x;
+    const cp2y = endY - ctrlDist * (-t1y);
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY);
+    cx = endX;
+    cy = endY;
+  }
+
+  ctx.bezierCurveTo(cx + c, cy - d, cx + b + c, cy - d, cx + a + b + c, cy - d);
+
+  ctx.closePath();
+}
+
+// Helper that picks the right path function based on settings
+function smartRectPath(ctx, x, y, w, h, r, useSquircle, cornerSmoothing) {
+  if (useSquircle && r > 0 && cornerSmoothing > 0) {
+    squircleRectPath(ctx, x, y, w, h, r, cornerSmoothing);
+  } else {
+    roundRectPath(ctx, x, y, w, h, r);
+  }
 }
 
 function escapeHtml(s) {
@@ -1264,6 +1584,17 @@ function renderPanel() {
     }px</span></label>
       <input id="es-r" type="range" min="0" max="48" step="1" value="${settings.roundedRadius
     }" />
+      <div class="row" style="margin-top:6px; gap:8px;">
+        <label class="checkbox-label">
+          <input type="checkbox" id="es-squircle" ${settings.squircleRounding ? 'checked' : ''} />
+          <span class="checkbox-custom"></span>
+          <span class="muted">Smooth corners</span>
+        </label>
+      </div>
+      ${settings.squircleRounding ? `
+      <label style="margin-top:6px;">Smoothing: <span id="es-smooth-label">${Math.round(settings.cornerSmoothing * 100)}%</span></label>
+      <input id="es-smooth" type="range" min="0" max="100" step="5" value="${Math.round(settings.cornerSmoothing * 100)}" />
+      ` : ''}
 
       <label style="margin-top:6px;">Format</label>
       <select id="es-format">
@@ -1439,6 +1770,26 @@ function renderPanel() {
       persistSettings();
       if (currentRect) positionUI(currentRect);
     };
+
+  // Squircle controls
+  const squircleEl = panel.querySelector("#es-squircle");
+  if (squircleEl)
+    squircleEl.onchange = () => {
+      settings.squircleRounding = squircleEl.checked;
+      persistSettings();
+      if (currentRect) positionUI(currentRect);
+      renderPanel(); // Re-render to show/hide smoothing slider
+    };
+
+  const smoothEl = panel.querySelector("#es-smooth");
+  if (smoothEl)
+    smoothEl.oninput = () => {
+      settings.cornerSmoothing = Math.max(0, Math.min(1, Number(smoothEl.value) / 100));
+      const lbl = panel.querySelector("#es-smooth-label");
+      if (lbl) lbl.textContent = Math.round(settings.cornerSmoothing * 100) + "%";
+      persistSettings();
+      if (currentRect) positionUI(currentRect);
+    };
   const cmEl = panel.querySelector("#es-cm");
   if (cmEl)
     cmEl.oninput = () => {
@@ -1611,6 +1962,8 @@ async function captureFlow() {
 
     const isAlpha = supportsAlpha(settings.format);
     const rr = Math.max(0, Number(settings.roundedRadius) || 0);
+    const useSquircle = !!settings.squircleRounding;
+    const smoothing = Math.max(0, Math.min(1, Number(settings.cornerSmoothing) || 0.6));
     const applyClip = rr > 0;
     if (applyClip) {
       ctx2.save();
@@ -1623,12 +1976,7 @@ async function captureFlow() {
         w = canvas.width,
         h = canvas.height;
       ctx2.beginPath();
-      ctx2.moveTo(x + r, y);
-      ctx2.arcTo(x + w, y, x + w, y + h, r);
-      ctx2.arcTo(x + w, y + h, x, y + h, r);
-      ctx2.arcTo(x, y + h, x, y, r);
-      ctx2.arcTo(x, y, x + w, y, r);
-      ctx2.closePath();
+      smartRectPath(ctx2, x, y, w, h, r, useSquircle, smoothing);
       ctx2.clip();
     }
 
@@ -1682,14 +2030,16 @@ async function captureFlow() {
     if (pad.l + pad.r + pad.t + pad.b > 0) {
       if (settings.paddingType === "colored" || !isAlpha) {
         ctx2.beginPath();
-        roundRectPath(ctx2, outer.x, outer.y, outer.w, outer.h, rOuter);
-        roundRectPath(
+        smartRectPath(ctx2, outer.x, outer.y, outer.w, outer.h, rOuter, useSquircle, smoothing);
+        smartRectPath(
           ctx2,
           marginRect.x,
           marginRect.y,
           marginRect.w,
           marginRect.h,
-          rMargin
+          rMargin,
+          useSquircle,
+          smoothing
         );
         ctx2.fillStyle = fillColor;
         ctx2.fill("evenodd");

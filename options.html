@@ -375,6 +375,59 @@
         grid-template-columns: 1fr 1fr;
       }
     }
+
+    .checkbox-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 14px;
+    }
+
+    .checkbox-container input[type="checkbox"] {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .checkmark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--card);
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .checkbox-container input[type="checkbox"]:checked+.checkmark {
+      background: var(--primary);
+      border-color: var(--primary);
+    }
+
+    .checkmark::after {
+      content: '';
+      display: none;
+      width: 5px;
+      height: 9px;
+      border: solid var(--primary-foreground);
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+      margin-bottom: 2px;
+    }
+
+    .checkbox-container input[type="checkbox"]:checked+.checkmark::after {
+      display: block;
+    }
+
+    .checkbox-container input[type="checkbox"]:focus+.checkmark {
+      box-shadow: 0 0 0 2px oklch(from var(--primary) l c h / 25%);
+    }
   </style>
 </head>
 
@@ -477,6 +530,11 @@
           <input id="opt-r" type="range" min="0" max="48" step="1" />
           <input type="number" class="val-input" id="lbl-r" min="0" max="48" value="0" />px
         </div>
+        <label class="checkbox-container" style="margin-top:10px;">
+          <input type="checkbox" id="opt-squircle" />
+          <span class="checkmark"></span>
+          Smooth corners (squircle)
+        </label>
       </div>
       <div>
         <label>Format</label>
@@ -486,6 +544,14 @@
           <option value="jpg">JPG</option>
           <option value="svg">SVG</option>
         </select>
+      </div>
+    </div>
+
+    <div id="section-smoothing" class="section" style="display: none">
+      <label>Corner Smoothing</label>
+      <div class="slider-row">
+        <input id="opt-smooth" type="range" min="0" max="100" step="5" />
+        <input type="number" class="val-input" id="lbl-smooth" min="0" max="100" value="60" />%
       </div>
     </div>
 
