@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2025-12-16
+- Add full element capture for elements larger than the viewport
+- Automatically detect when element exceeds visible screen area
+- Take multiple screenshots and stitch them together seamlessly
+
 ## [0.1.27] - 2025-12-16
 - Add optional squircle (smooth corners) rounding mode based on Figma's corner smoothing algorithm
 - New "Smooth corners" checkbox in both settings panel and options page

@@ -1901,9 +1901,290 @@ function getPadsPx(dpr) {
   return { l: p, r: p, t: p, b: p };
 }
 
+/**
+ * Get element's bounding rect relative to the document (not viewport).
+ * Returns { x, y, width, height } in document coordinates.
+ */
+function getElementDocumentRect(element) {
+  const rect = element.getBoundingClientRect();
+  return {
+    x: rect.left + window.scrollX,
+    y: rect.top + window.scrollY,
+    width: rect.width,
+    height: rect.height,
+  };
+}
+
+/**
+ * Calculate the grid of tiles needed to capture the full element.
+ * Each tile represents one screenshot region.
+ * @param {Object} elementRect - Element rect in document coordinates
+ * @param {Object} viewportSize - { width, height } of viewport
+ * @returns {Object} Object with tiles array and captureRect
+ */
+function calculateTiles(elementRect, viewportSize) {
+  const tiles = [];
+  const margin = Number(settings.captureMargin) || 0;
+
+  // Expand element rect by capture margin
+  const captureRect = {
+    x: elementRect.x - margin,
+    y: elementRect.y - margin,
+    width: elementRect.width + margin * 2,
+    height: elementRect.height + margin * 2,
+  };
+
+  // Each tile is viewport-sized
+  const tileStepX = viewportSize.width;
+  const tileStepY = viewportSize.height;
+
+  // Calculate number of tiles needed
+  const cols = Math.ceil(captureRect.width / tileStepX);
+  const rows = Math.ceil(captureRect.height / tileStepY);
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const docX = captureRect.x + col * tileStepX;
+      const docY = captureRect.y + row * tileStepY;
+
+      // Calculate actual tile dimensions (may be smaller at edges)
+      const tileWidth = Math.min(viewportSize.width, captureRect.x + captureRect.width - docX);
+      const tileHeight = Math.min(viewportSize.height, captureRect.y + captureRect.height - docY);
+
+      tiles.push({
+        docX,
+        docY,
+        width: tileWidth,
+        height: tileHeight,
+        col,
+        row,
+      });
+    }
+  }
+
+  return { tiles, cols, rows, captureRect };
+}
+
+/**
+ * Capture a large element by taking multiple screenshots and stitching them together.
+ */
+async function captureStitched(elementRect, viewportSize) {
+  const dpr = window.devicePixelRatio || 1;
+  const margin = Math.floor((Number(settings.captureMargin) || 0) * dpr);
+  const pad = getPadsPx(dpr);
+
+  // Calculate tiles needed
+  const { tiles, captureRect } = calculateTiles(elementRect, viewportSize);
+
+  // Save current scroll position
+  const savedScrollX = window.scrollX;
+  const savedScrollY = window.scrollY;
+
+  // Capture all tiles
+  const tileImages = [];
+
+  try {
+    for (const tile of tiles) {
+      // Scroll to position this tile at the top-left of the viewport
+      window.scrollTo({
+        left: tile.docX,
+        top: tile.docY,
+        behavior: 'instant',
+      });
+
+      // Wait for scroll and paint to settle
+      await new Promise(r => setTimeout(r, SCROLL_INTO_VIEW_MS));
+      await waitFrames(2);
+      await new Promise(r => setTimeout(r, FRAME_SETTLE_MS));
+
+      // Detach UI
+      const ctx = detachUI();
+      await waitFrames(2);
+      await new Promise(r => setTimeout(r, FRAME_SETTLE_MS));
+
+      // Capture screenshot
+      const cap = await withTimeout(
+        new Promise((resolve) =>
+          chrome.runtime.sendMessage({ type: "CAPTURE" }, resolve)
+        ),
+        CAPTURE_TIMEOUT_MS
+      );
+
+      // Reattach UI
+      reattachUI(ctx);
+
+      if (!cap?.ok) throw new Error(cap?.error || "CAPTURE_FAILED");
+
+      const image = await createImageFromDataURL(cap.dataUrl);
+
+      // Calculate the region within this screenshot that we need
+      // The element portion starts at (0, 0) since we scrolled to position it there
+      const cropX = 0;
+      const cropY = 0;
+      const cropWidth = Math.min(tile.width * dpr, image.width);
+      const cropHeight = Math.min(tile.height * dpr, image.height);
+
+      tileImages.push({
+        image,
+        tile,
+        cropX,
+        cropY,
+        cropWidth,
+        cropHeight,
+        // Position in final stitched canvas (document position relative to captureRect)
+        destX: (tile.docX - captureRect.x) * dpr,
+        destY: (tile.docY - captureRect.y) * dpr,
+      });
+    }
+  } finally {
+    // Restore original scroll position
+    window.scrollTo({
+      left: savedScrollX,
+      top: savedScrollY,
+      behavior: 'instant',
+    });
+    await new Promise(r => setTimeout(r, SCROLL_INTO_VIEW_MS));
+  }
+
+  // Create stitched canvas
+  const stitchedWidth = Math.ceil(captureRect.width * dpr);
+  const stitchedHeight = Math.ceil(captureRect.height * dpr);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = stitchedWidth + pad.l + pad.r;
+  canvas.height = stitchedHeight + pad.t + pad.b;
+  const ctx2 = canvas.getContext("2d");
+
+  // Apply clipping for rounded corners
+  const isAlpha = supportsAlpha(settings.format);
+  const rr = Math.max(0, Number(settings.roundedRadius) || 0);
+  const useSquircle = !!settings.squircleRounding;
+  const smoothing = Math.max(0, Math.min(1, Number(settings.cornerSmoothing) || 0.6));
+  const applyClip = rr > 0;
+
+  if (applyClip) {
+    ctx2.save();
+    const r = Math.min(rr, Math.floor(Math.min(canvas.width, canvas.height) / 2));
+    ctx2.beginPath();
+    smartRectPath(ctx2, 0, 0, canvas.width, canvas.height, r, useSquircle, smoothing);
+    ctx2.clip();
+  }
+
+  // Clear canvas
+  ctx2.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw each tile at its position
+  for (const ti of tileImages) {
+    ctx2.drawImage(
+      ti.image,
+      ti.cropX,
+      ti.cropY,
+      ti.cropWidth,
+      ti.cropHeight,
+      pad.l + ti.destX,
+      pad.t + ti.destY,
+      ti.cropWidth,
+      ti.cropHeight
+    );
+  }
+
+  // Handle padding fill (similar to single capture)
+  const outer = { x: 0, y: 0, w: canvas.width, h: canvas.height };
+  const marginRect = { x: pad.l, y: pad.t, w: stitchedWidth, h: stitchedHeight };
+  const contentRect = {
+    x: pad.l + margin,
+    y: pad.t + margin,
+    w: Math.max(0, stitchedWidth - margin * 2),
+    h: Math.max(0, stitchedHeight - margin * 2),
+  };
+
+  const rOuter = Math.min(rr, Math.floor(Math.min(outer.w, outer.h) / 2));
+  const rMargin = Math.min(rr, Math.floor(Math.min(marginRect.w, marginRect.h) / 2));
+  const rContent = Math.min(rr, Math.floor(Math.min(contentRect.w, contentRect.h) / 2));
+
+  const fillColor = settings.paddingColor || "#ffffff";
+
+  // Padding ring: outer - margin
+  if (pad.l + pad.r + pad.t + pad.b > 0) {
+    if (settings.paddingType === "colored" || !isAlpha) {
+      ctx2.beginPath();
+      smartRectPath(ctx2, outer.x, outer.y, outer.w, outer.h, rOuter, useSquircle, smoothing);
+      smartRectPath(ctx2, marginRect.x, marginRect.y, marginRect.w, marginRect.h, rMargin, useSquircle, smoothing);
+      ctx2.fillStyle = fillColor;
+      ctx2.fill("evenodd");
+    }
+  }
+
+  // Margin ring: if captureMargin > 0 and paddingType is colored
+  if (margin > 0 && (settings.paddingType === "colored" || !isAlpha)) {
+    ctx2.beginPath();
+    smartRectPath(ctx2, marginRect.x, marginRect.y, marginRect.w, marginRect.h, rMargin, useSquircle, smoothing);
+    smartRectPath(ctx2, contentRect.x, contentRect.y, contentRect.w, contentRect.h, rContent, useSquircle, smoothing);
+    ctx2.fillStyle = fillColor;
+    ctx2.fill("evenodd");
+  }
+
+  if (applyClip) {
+    ctx2.restore();
+  }
+
+  // Export
+  let dataUrl, ext;
+  if (settings.format === "svg") {
+    const raster = canvas.toDataURL("image/png");
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}" viewBox="0 0 ${canvas.width} ${canvas.height}"><image href="${raster}" width="${canvas.width}" height="${canvas.height}"/></svg>`;
+    dataUrl = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+    ext = "svg";
+  } else {
+    const mime =
+      settings.format === "jpg"
+        ? "image/jpeg"
+        : settings.format === "webp"
+          ? "image/webp"
+          : "image/png";
+    const quality = (settings.quality || 90) / 100;
+    dataUrl = canvas.toDataURL(mime, quality);
+    ext =
+      settings.format === "jpg"
+        ? "jpg"
+        : settings.format === "webp"
+          ? "webp"
+          : "png";
+  }
+
+  const ts = new Date().toISOString().replace(/[:.]/g, "-");
+  const prefixSafe = sanitizeFilename(settings.filenamePrefix || "element-screenshot");
+  const filename = `${prefixSafe}-${ts}.${ext}`;
+
+  await withTimeout(
+    new Promise((resolve) =>
+      chrome.runtime.sendMessage({ type: "DOWNLOAD", dataUrl, filename }, resolve)
+    ),
+    CAPTURE_TIMEOUT_MS
+  );
+}
+
 async function captureFlow() {
   try {
     if (!currentTarget || !document.contains(currentTarget)) return;
+
+    // Get element rect in document coordinates to check if it needs stitching
+    const elementDocRect = getElementDocumentRect(currentTarget);
+    const viewportSize = { width: window.innerWidth, height: window.innerHeight };
+    const margin = Number(settings.captureMargin) || 0;
+
+    // Check if element (with margin) exceeds viewport dimensions
+    const totalWidth = elementDocRect.width + margin * 2;
+    const totalHeight = elementDocRect.height + margin * 2;
+    const needsStitching = totalWidth > viewportSize.width || totalHeight > viewportSize.height;
+
+    if (needsStitching) {
+      // Use multi-screenshot stitching for large elements
+      await captureStitched(elementDocRect, viewportSize);
+      return;
+    }
+
+    // Single screenshot capture for elements that fit in viewport
     currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" });
     await new Promise((r) => setTimeout(r, SCROLL_INTO_VIEW_MS));
     const r = currentTarget.getBoundingClientRect();
