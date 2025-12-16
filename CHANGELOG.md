@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.26] - 2025-12-16
+- Fix extension showing "active" status on restricted pages where content scripts cannot run
+- Add rigorous 4-layer URL restriction detection:
+  - Forbidden schemes (chrome://, chrome-untrusted://, chrome-search://, chrome-signin://, about:, view-source:, devtools://)
+  - Protected Web Store domains (Chrome Web Store)
+  - Cross-extension restriction (prevents injection into other extensions' pages)
+  - Configurable restrictions (file:// protocol)
+- Show temporary red "N/A" badge when clicking extension on restricted pages
+
 ## [0.1.25] - 2025-12-15
 - Complete UI design overhaul
 - Add light/dark theme support with system preference detection

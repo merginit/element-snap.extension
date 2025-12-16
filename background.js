@@ -22,6 +22,75 @@
 
 const tabStates = new Map(); // tabId -> { active: boolean }
 
+/**
+ * Rigorously checks if a URL is restricted for Chrome Extensions (Manifest V3).
+ * @param {string} url - The URL to check.
+ * @returns {boolean} True if the extension cannot/should not run here.
+ */
+function isRestrictedUrl(url) {
+  if (!url) return true; // Undefined URLs (like pre-loading tabs) are unsafe
+
+  try {
+    const urlObj = new URL(url);
+    const protocol = urlObj.protocol;
+    const hostname = urlObj.hostname;
+
+    // 1. STRICTLY FORBIDDEN SCHEMES
+    // These grant high-level system access or internal browser control.
+    const forbiddenSchemes = [
+      "chrome:",
+      "chrome-untrusted:", // Print preview / PDF sandboxes
+      "chrome-search:",    // Google New Tab Page
+      "chrome-signin:",    // Browser sign-in flows
+      "chrome-error:",     // Network errors
+      "chrome-native:",
+      "about:",            // about:settings, about:policy (except about:blank sometimes)
+      "view-source:",      // Source code view
+      "devtools:",         // Developer tools
+    ];
+
+    if (forbiddenSchemes.some(scheme => protocol === scheme)) {
+      return true;
+    }
+
+    // 2. PROTECTED WEB STORES
+    // Scripts are blocked here to prevent review manipulation or malware installation.
+    const protectedDomains = [
+      "chromewebstore.google.com",
+      "chrome.google.com",         // Legacy Web Store paths
+    ];
+
+    if (protectedDomains.some(d => hostname === d || hostname.endsWith("." + d))) {
+      return true;
+    }
+
+    // 3. CROSS-EXTENSION RESTRICTION
+    // You cannot run scripts inside other extensions' pages.
+    if (protocol === "chrome-extension:") {
+      // If we are in an extension context, we can check if this URL belongs to US.
+      // If chrome.runtime.id is available, we check against it.
+      if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.id) {
+        return hostname !== chrome.runtime.id;
+      }
+      // If we can't check the ID, assume it's restricted to be safe.
+      return true;
+    }
+
+    // 4. CONFIGURABLE RESTRICTIONS
+    // "file:" is usually blocked unless the user manually enabled it.
+    if (protocol === "file:") {
+      return true;
+    }
+
+    return false;
+
+  } catch (_) {
+    // If URL parsing fails, it's likely a pseudo-protocol (like "javascript:") 
+    // or malformed, so we treat it as restricted.
+    return true;
+  }
+}
+
 function setActiveBadge(tabId, active) {
   chrome.action.setBadgeText({ tabId, text: active ? "ON" : "" });
   if (active)
@@ -63,11 +132,23 @@ async function toggleForTab(tabId) {
         type: "TOGGLE",
         active: next.active,
       });
-    } catch (e) {}
+    } catch (_) { }
   }
 }
 
-chrome.action.onClicked.addListener((tab) => {
+chrome.action.onClicked.addListener(async (tab) => {
+  if (isRestrictedUrl(tab?.url)) {
+    // Show "N/A" badge briefly to indicate extension cannot run here
+    const tabId = tab?.id;
+    if (tabId != null) {
+      chrome.action.setBadgeText({ tabId, text: "N/A" });
+      chrome.action.setBadgeBackgroundColor({ tabId, color: "#DC2626" });
+      setTimeout(() => {
+        chrome.action.setBadgeText({ tabId, text: "" });
+      }, 2000);
+    }
+    return;
+  }
   toggleForTab(tab?.id);
 });
 
@@ -81,7 +162,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
     if (ok) {
       try {
         await chrome.tabs.sendMessage(tabId, { type: "TOGGLE", active: true });
-      } catch (_) {}
+      } catch (_) { }
     }
   }
 });
@@ -106,7 +187,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (ok) {
           try {
             await chrome.tabs.sendMessage(tabId, { type: "TOGGLE", active });
-          } catch (_) {}
+          } catch (_) { }
         }
         sendResponse({ ok: true });
       } catch (e) {
