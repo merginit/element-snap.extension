@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2025-12-16
+- Fix inner paths losing rounded corners at certain padding/margin sizes when squircle mode enabled
+- Add guards to gracefully fall back to standard rounded corners when squircle parameters become degenerate
+
 ## [0.2.0] - 2025-12-16
 - Add full element capture for elements larger than the viewport
 - Automatically detect when element exceeds visible screen area

@@ -1058,6 +1058,13 @@ function squircleRectPath(ctx, x, y, w, h, r, cornerSmoothing) {
 
   const roundingAndSmoothingBudget = Math.min(w, h) / 2;
   const cornerRadius = Math.min(r, roundingAndSmoothingBudget);
+
+  // Guard: if cornerRadius is 0 or budget is too small, use regular rounded rect
+  if (cornerRadius <= 0 || roundingAndSmoothingBudget <= 0) {
+    roundRectPath(ctx, x, y, w, h, Math.max(0, r));
+    return;
+  }
+
   const params = getPathParamsForCorner(cornerRadius, cornerSmoothing, roundingAndSmoothingBudget);
   const { a, b, c, d, p, arcSectionLength } = params;
   const R = params.cornerRadius;
@@ -1065,22 +1072,31 @@ function squircleRectPath(ctx, x, y, w, h, r, cornerSmoothing) {
   // For bezier arc approximation: k = (4/3) * tan(θ/4)
   // where θ is the arc sweep angle
   const effectiveSmoothing = Math.min(cornerSmoothing, roundingAndSmoothingBudget / cornerRadius - 1);
+
+  // Guard: if effective smoothing is too low (approaching 0), 
+  // the squircle degenerates to a regular rounded rect
+  if (effectiveSmoothing < 0.01) {
+    roundRectPath(ctx, x, y, w, h, cornerRadius);
+    return;
+  }
+
   const arcMeasure = 90 * (1 - effectiveSmoothing);
   const arcAngleRad = toRadians(arcMeasure);
   const kappa = (4 / 3) * Math.tan(arcAngleRad / 4);
 
-  // The key insight: the arc connects smoothly between two bezier curves
-  // First bezier ends with tangent direction proportional to (c, d) - normalized
-  // Second bezier starts with tangent direction proportional to (d, c) - normalized
-  // The arc's control points go in these tangent directions at distance kappa * R
-
   // Normalize the tangent vectors
   const mag1 = Math.sqrt(c * c + d * d);
-  const mag2 = Math.sqrt(d * d + c * c); // same as mag1
+
+  // Guard: if tangent magnitude is too small, fall back to rounded rect
+  if (mag1 < 0.001) {
+    roundRectPath(ctx, x, y, w, h, cornerRadius);
+    return;
+  }
+
   const t1x = c / mag1; // start tangent x component (for top-right)
   const t1y = d / mag1; // start tangent y component
-  const t2x = d / mag2; // end tangent x component  
-  const t2y = c / mag2; // end tangent y component
+  const t2x = d / mag1; // end tangent x component  
+  const t2y = c / mag1; // end tangent y component
 
   const ctrlDist = kappa * R;
 
