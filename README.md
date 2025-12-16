@@ -27,15 +27,20 @@ This approach is:
 * **Reliable:** Preserves 100% of the element's styling, layout, and fonts.
 * **Lightweight:** Built with zero libraries-, just vanilla JavaScript and the Chrome API for maximum speed.
 
-> The only trade-off is that the element must be fully visible in the viewport to be captured.
+> **Note:** For elements within the viewport, a direct screenshot is taken. For larger elements, multiple screenshots are automatically stitched together.
 
 ## Features
 
-* **Pixel-Perfect Capture:** Get a flawless image of any hovered element.
+* **Pixel-Perfect Capture:** Get a flawless image of any hovered element, including elements larger than the viewport.
+* **Full Element Capture:** Automatically detects oversized elements and stitches multiple screenshots seamlessly.
 * **Live Padding Controls:** Add uniform or per-side padding with a real-time preview.
+* **Capture Margin:** Include real page pixels around the element for context.
 * **Flexible Output:** Save as PNG, JPG, WEBP, or SVG. Adjust quality for lossy formats.
+* **Rounded Corners:** Apply standard or squircle (smooth, iOS-like) corner rounding to exports.
+* **Theme Support:** Light, Dark, or System theme with automatic detection.
 * **Element Hiding:** Temporarily hide surrounding elements with a keypress (`H`) for a clean shot.
-* **Keyboard Shortcuts:** Capture (`Ctrl/Cmd+Click`), lock focus (`L`), and more for a fast workflow.
+* **Dim Mode:** Reduce overlay opacity for better visibility of underlying content.
+* **Keyboard Shortcuts:** Capture (`Ctrl/Cmd+Click`), lock focus (`L`), restore hidden elements (`R`), and more.
 
 ## How to Use
 
