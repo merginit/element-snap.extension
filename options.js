@@ -79,6 +79,10 @@ function load() {
     document.getElementById("opt-smooth").value = Math.round(s.cornerSmoothing * 100);
     document.getElementById("lbl-smooth").value = Math.round(s.cornerSmoothing * 100);
 
+    // Redaction
+    document.getElementById("opt-redact-shape").value = s.redactionShape;
+    document.getElementById("opt-redact-mode").value = s.redactionMode;
+
     toggleModeSections(s.paddingMode);
     toggleQualitySection(s.format);
     toggleSmoothingSection(s.squircleRounding);
@@ -97,6 +101,8 @@ function save() {
   prefs.roundedRadius = Number(document.getElementById("opt-r").value) || 0;
   prefs.squircleRounding = document.getElementById("opt-squircle").checked;
   prefs.cornerSmoothing = (Number(document.getElementById("opt-smooth").value) || 60) / 100;
+  prefs.redactionShape = document.getElementById("opt-redact-shape").value;
+  prefs.redactionMode = document.getElementById("opt-redact-mode").value;
   prefs.format = document.getElementById("opt-format").value;
   prefs.quality = Number(document.getElementById("opt-q").value) || 90;
   if (prefs.paddingMode === "uniform") {

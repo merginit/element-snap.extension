@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2026-01-17
+- **New Feature: Redaction Tools:**
+  - Added comprehensive tools to redact sensitive content before capturing.
+  - **Multiple Styles:** Choose between Solid Color, Blur, or Pixelate effects with adjustable intensity.
+  - **Shapes:** Support for both Rectangle and Circle redaction shapes.
+  - **Interactive Editing:** Select any redaction on the canvas to resize, move, or tweak its specific settings (color, intensity) instantly.
+  - **Configurable Defaults:** Set your preferred default shape and style in the Options page.
+  - **Polished Experience:** Features a clean UI with custom confirmation modals and immediate visual feedback.
+- **Bug Fixes:**
+  - Fixed an issue where the "Hidden Elements" list and count in the panel would not update immediately after hiding an element.
+  - Fixed an issue where stitched screenshots for large elements were misaligned or sidestepped.
+
 ## [0.2.3] - 2025-12-16
 - Fix "Extension context invalidated" error spam when extension is reloaded
 - State sync interval now stops itself when extension context is lost

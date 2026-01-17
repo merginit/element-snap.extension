@@ -29,6 +29,20 @@ let padCanvas = null,
 let rafId = null;
 let hideTimer = null;
 let lockRaf = null;
+
+// Redaction State
+let REDACT_MODE = false;
+let redactions = []; // { id, x, y, width, height, type: 'rect'|'circle', style: 'solid'|'blur'|'pixelate', color, intensity }
+let currentRedaction = null; // Currently being drawn
+let selectedRedactionId = null;
+let redactionSettings = {
+  shape: 'rect', // rect, circle
+  style: 'solid', // solid, blur, pixelate
+  color: '#000000',
+  intensity: 50 // 0-100
+};
+let redactionLayer = null; // Container for redaction elements
+
 let hiddenElements = []; // stack of { el, prevStyle, hadStyleAttr, label }
 let host = null;
 let shadowRoot = null;
@@ -138,8 +152,10 @@ const STYLE = css`
     --es-border: oklch(0.922 0 0);
     --es-input: oklch(0.922 0 0);
     --es-radius: 0.625rem;
+    --es-destructive: oklch(0.58 0.22 27);
   }
   :host(.dark) {
+    --es-destructive: oklch(0.704 0.191 22.216);
     --es-background: oklch(0.145 0 0);
     --es-foreground: oklch(0.985 0 0);
     --es-card: oklch(0.205 0 0);
@@ -183,6 +199,47 @@ const STYLE = css`
     inset: 0;
     pointer-events: none;
     z-index: ${Z_PADMASK};
+  }
+  #es-redaction-layer {
+     position: fixed;
+     inset: 0;
+     z-index: ${Z_PADMASK + 1}; /* Above outline/mask, below panel */
+     pointer-events: auto;
+     cursor: crosshair;
+  }
+  .es-r-item {
+     position: absolute;
+     pointer-events: auto;
+     box-sizing: border-box;
+     cursor: move;
+  }
+  .es-r-item:hover {
+     outline: 2px solid var(--es-primary);
+     outline-offset: 2px;
+  }
+  .es-r-item.selected {
+     outline: 2px solid var(--es-primary);
+     outline-offset: 2px;
+     z-index: 10;
+  }
+  .es-r-handle {
+     position: absolute;
+     width: 8px;
+     height: 8px;
+     background: var(--es-card);
+     border: 1px solid var(--es-primary);
+     border-radius: 50%;
+     z-index: 11;
+     display: none;
+  }
+  .es-r-item.selected .es-r-handle {
+     display: block;
+  }
+  #es-redaction-layer.readonly {
+    pointer-events: none;
+  }
+  #es-redaction-layer.readonly .es-r-item {
+    pointer-events: none;
   }
   .es-pad {
     position: fixed;
@@ -430,6 +487,100 @@ const STYLE = css`
   #es-panel .checkbox-label input[type="checkbox"]:focus + .checkbox-custom {
     box-shadow: 0 0 0 2px oklch(from var(--es-primary) l c h / 25%);
   }
+  .es-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: ${Z_PANEL + 1};
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    backdrop-filter: blur(2px);
+  }
+  .es-modal {
+    background: var(--es-card);
+    width: 300px;
+    max-width: 90vw;
+    padding: 16px;
+    border-radius: var(--es-radius);
+    border: 1px solid var(--es-border);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    font: 12px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
+    color: var(--es-card-foreground);
+    animation: es-pop 0.15s ease-out;
+  }
+  .es-modal h3 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .es-modal p {
+    margin: 0 0 16px 0;
+    color: var(--es-muted-foreground);
+  }
+  .es-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .es-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 28px;
+    padding: 0 12px;
+    border-radius: calc(var(--es-radius) - 2px);
+    border: 1px solid var(--es-border);
+    background: var(--es-card);
+    color: var(--es-card-foreground);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.15s ease;
+  }
+  .es-btn:hover {
+     background: var(--es-accent);
+  }
+  .es-btn.primary {
+    background: var(--es-primary);
+    color: var(--es-primary-foreground);
+    border-color: var(--es-primary);
+  }
+  .es-btn.destructive {
+    background: var(--es-destructive);
+    color: white;
+    border-color: var(--es-destructive);
+  }
+  .es-btn.destructive:hover {
+    opacity: 0.9;
+  }
+  .es-btn.ghost {
+    background: transparent;
+    border-color: transparent;
+  }
+  .es-btn.ghost:hover {
+    background: var(--es-accent);
+  }
+  @keyframes es-pop {
+    from { transform: scale(0.95); opacity: 1; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  /* Capture Mode: Hide UI but keep redactions visible */
+  :host(.es-capturing) #es-panel,
+  :host(.es-capturing) #es-outline,
+  :host(.es-capturing) #es-padmask,
+  :host(.es-capturing) #es-overlay,
+  :host(.es-capturing) .es-r-handle {
+    display: none !important;
+  }
+  :host(.es-capturing) .es-r-item {
+    outline: none !important;
+  }
+  :host(.es-capturing) #es-redaction-layer {
+    display: block !important;
+  }
 `;
 
 function ensureHost() {
@@ -539,6 +690,10 @@ function loadSettings() {
     chrome.storage.sync.get({ elementShotPrefs: DEFAULTS }, (data) => {
       const prefs = migrateSettings(data.elementShotPrefs || DEFAULTS);
       settings = prefs;
+      if (!REDACT_MODE) {
+        redactionSettings.shape = settings.redactionShape || 'rect';
+        redactionSettings.style = settings.redactionMode || 'solid';
+      }
       applyHostTheme();
       resolve(settings);
     });
@@ -568,6 +723,11 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
     // Update all settings
     settings = newPrefs;
+
+    if (!REDACT_MODE) {
+      redactionSettings.shape = settings.redactionShape || 'rect';
+      redactionSettings.style = settings.redactionMode || 'solid';
+    }
 
     // Apply theme if changed
     if (themeChanged) {
@@ -1473,10 +1633,9 @@ function onKeyDown(e) {
     if (currentTarget) {
       const done = hideCurrentElement();
       if (done) {
-        LOCKED = false;
+        // Keep LOCKED state as is
         currentTarget = null;
-        currentRect = null;
-        hideUIForScroll();
+        // Keep currentRect so panel stays visible
         renderPanel();
       }
     }
@@ -1491,7 +1650,7 @@ function onKeyDown(e) {
 function getPanelStructureKey() {
   const isAlpha = supportsAlpha(settings.format);
   const showQuality = settings.format === "jpg" || settings.format === "webp";
-  return `${settings.paddingMode}|${isAlpha}|${settings.paddingType}|${showQuality}`;
+  return `${settings.paddingMode}|${isAlpha}|${settings.paddingType}|${showQuality}|${REDACT_MODE}|${redactions.length}|${redactionSettings.shape}|${redactionSettings.style}|${hiddenElements.length}|${selectedRedactionId}`;
 }
 
 function updatePanelDynamicContent() {
@@ -1627,6 +1786,9 @@ function renderPanel() {
         </div>
       </div>
 
+      ${REDACT_MODE ? renderRedactionControls() : ''}
+
+      <div style="display: ${REDACT_MODE ? 'none' : 'block'}">
       <label>Padding Mode</label>
       <div class="row">
         <button class="btn ${uniform ? "primary" : ""
@@ -1695,17 +1857,23 @@ function renderPanel() {
 
       <div style="margin-top:8px; display:grid; gap:6px;">
         <div class="shortcut"><span class="kbd">Ctrl/Cmd</span><span>+</span><span class="kbd">Click</span><span class="muted">Capture</span></div>
-        <div class="shortcut"><span class="kbd">L</span><span class="muted">Lock/Unlock</span></div>
-        <div class="shortcut"><span class="kbd">Esc</span><span class="muted">Unlock</span></div>
+        <div class="row" style="gap:12px;">
+          <div class="shortcut"><span class="kbd">L</span><span class="muted">Lock/Unlock</span></div>
+          <div class="shortcut"><span class="kbd">Esc</span><span class="muted">Unlock</span></div>
+        </div>
       </div>
-      <div class="row" style="margin-top:8px;">
-        <button class="btn ghost" id="es-close">Close</button>
-        <button class="btn primary" id="es-capture">Capture</button>
-      </div>
+    </div>
+    <div class="row" style="margin-top:8px; padding-top:8px; border-top:1px solid var(--es-border);">
+      <button class="btn ghost" id="es-close">Close</button>
+      <button class="btn ${REDACT_MODE ? "primary" : ""}" id="es-redact-toggle" title="Redact/Censor">Redact</button>
+      <button class="btn primary" id="es-capture">Capture</button>
     </div>`;
 
   // Wire interactions
   panel.querySelector("#es-toggle").onclick = () => setActiveSoft(!ACTIVE);
+  panel.querySelector("#es-redact-toggle").onclick = () => {
+    toggleRedactionMode();
+  };
   panel.querySelector("#es-lock").onclick = () => {
     LOCKED = !LOCKED;
     if (LOCKED) ensureLockedTracking();
@@ -1880,7 +2048,9 @@ function renderPanel() {
     };
 
   updateHiddenList();
+  updateHiddenList();
   applyPanelOpacity();
+  bindRedactionEvents();
 }
 
 function applyPanelOpacity() {
@@ -1939,22 +2109,6 @@ function waitFrames(n = 2) {
   });
 }
 
-function detachUI() {
-  const parent = host && host.parentNode ? host.parentNode : null;
-  const removed = [];
-  if (host && parent) {
-    parent.removeChild(host);
-    removed.push("host");
-  }
-  return { removed, root: parent };
-}
-
-function reattachUI(ctx) {
-  if (!ctx) return;
-  const parent = ctx.root || document.body || document.documentElement;
-  if (ctx.removed?.includes("host") && host) parent.appendChild(host);
-}
-
 function getPadsPx(dpr) {
   if (settings.paddingMode === "sides") {
     const s = settings.paddingSides || DEFAULTS.paddingSides;
@@ -1981,6 +2135,239 @@ function getElementDocumentRect(element) {
     width: rect.width,
     height: rect.height,
   };
+}
+
+function enterCaptureMode() {
+  if (host) {
+    host.classList.add('es-capturing');
+  }
+}
+
+function exitCaptureMode() {
+  if (host) {
+    host.classList.remove('es-capturing');
+  }
+}
+
+async function captureFlow() {
+  try {
+    if (!currentRect || !document.contains(currentTarget)) return;
+
+    // Get element rect in document coordinates to check if it needs stitching
+    const elementDocRect = getElementDocumentRect(currentTarget);
+    const viewportSize = { width: window.innerWidth, height: window.innerHeight };
+    const margin = Number(settings.captureMargin) || 0;
+
+    // Check if element (with margin) exceeds viewport dimensions
+    const totalWidth = elementDocRect.width + margin * 2;
+    const totalHeight = elementDocRect.height + margin * 2;
+    const needsStitching = totalWidth > viewportSize.width || totalHeight > viewportSize.height;
+
+    if (needsStitching) {
+      // Use multi-screenshot stitching for large elements
+      await captureStitched(elementDocRect, viewportSize);
+      return;
+    }
+
+    // Single screenshot capture for elements that fit in viewport
+    currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" });
+    await new Promise((r) => setTimeout(r, SCROLL_INTO_VIEW_MS));
+    const r = currentTarget.getBoundingClientRect();
+    currentRect = {
+      x: Math.round(r.left),
+      y: Math.round(r.top),
+      width: Math.round(r.width),
+      height: Math.round(r.height),
+    };
+
+    // Visual feedback
+    if (box) box.style.opacity = "0";
+
+    // Hide UI via CSS class
+    enterCaptureMode();
+
+    // Short delay to ensure browser paints the hidden state
+    await new Promise(r => requestAnimationFrame(() => setTimeout(r, 50)));
+
+    const dpr = window.devicePixelRatio || 1;
+    const cap = await withTimeout(
+      new Promise((resolve) =>
+        chrome.runtime.sendMessage({ type: "CAPTURE" }, resolve)
+      ),
+      CAPTURE_TIMEOUT_MS
+    );
+
+    // Restore UI immediately
+    exitCaptureMode();
+    if (box) box.style.opacity = "1";
+
+    if (!cap?.ok) throw new Error(cap?.error || "CAPTURE_FAILED");
+
+    const image = await createImageFromDataURL(cap.dataUrl);
+    const canvas = document.createElement("canvas");
+    const targetW = Math.max(1, Math.floor(currentRect.width * dpr));
+    const targetH = Math.max(1, Math.floor(currentRect.height * dpr));
+    const marginPx = Math.max(
+      0,
+      Math.floor((Number(settings.captureMargin) || 0) * dpr)
+    );
+    const pad = getPadsPx(dpr);
+    // Compute crop rect with margin and clamp to captured image bounds
+    const rawSx = Math.floor(currentRect.x * dpr) - marginPx;
+    const rawSy = Math.floor(currentRect.y * dpr) - marginPx;
+    const rawSW = targetW + marginPx * 2;
+    const rawSH = targetH + marginPx * 2;
+    const sx = Math.max(0, rawSx);
+    const sy = Math.max(0, rawSy);
+    const sWidth = Math.min(
+      rawSW - (sx - rawSx),
+      Math.max(0, image.width - sx)
+    );
+    const sHeight = Math.min(
+      rawSH - (sy - rawSy),
+      Math.max(0, image.height - sy)
+    );
+
+    canvas.width = sWidth + pad.l + pad.r;
+    canvas.height = sHeight + pad.t + pad.b;
+    const ctx2 = canvas.getContext("2d");
+
+    const isAlpha = supportsAlpha(settings.format);
+    const rr = Math.max(0, Number(settings.roundedRadius) || 0);
+    const useSquircle = !!settings.squircleRounding;
+    const smoothing = Math.max(0, Math.min(1, Number(settings.cornerSmoothing) || 0.6));
+    const applyClip = rr > 0;
+    if (applyClip) {
+      ctx2.save();
+      const r = Math.min(
+        rr,
+        Math.floor(Math.min(canvas.width, canvas.height) / 2)
+      );
+      const x = 0,
+        y = 0,
+        w = canvas.width,
+        h = canvas.height;
+      ctx2.beginPath();
+      smartRectPath(ctx2, x, y, w, h, r, useSquircle, smoothing);
+      ctx2.clip();
+    }
+
+    // Always start with a cleared canvas inside the outer clip
+    ctx2.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw the captured content first
+    ctx2.drawImage(
+      image,
+      sx,
+      sy,
+      sWidth,
+      sHeight,
+      pad.l,
+      pad.t,
+      sWidth,
+      sHeight
+    );
+
+    // NOTE: Redactions are already captured in the image because we focused "Capture Mode" 
+    // to include #es-redaction-layer. No need to re-draw them.
+
+    // Compute rects for ring fills
+    const outer = { x: 0, y: 0, w: canvas.width, h: canvas.height };
+    const marginRect = { x: pad.l, y: pad.t, w: sWidth, h: sHeight };
+    const trimLeft = Math.max(0, sx - rawSx);
+    const trimTop = Math.max(0, sy - rawSy);
+    const trimRight = Math.max(0, rawSW - trimLeft - sWidth);
+    const trimBottom = Math.max(0, rawSH - trimTop - sHeight);
+    const mLeft = Math.max(0, marginPx - trimLeft);
+    const mTop = Math.max(0, marginPx - trimTop);
+    const mRight = Math.max(0, marginPx - trimRight);
+    const mBottom = Math.max(0, marginPx - trimBottom);
+    const contentRect = {
+      x: marginRect.x + mLeft,
+      y: marginRect.y + mTop,
+      w: Math.max(0, marginRect.w - mLeft - mRight),
+      h: Math.max(0, marginRect.h - mTop - mBottom),
+    };
+
+    const rOuter = Math.min(rr, Math.floor(Math.min(outer.w, outer.h) / 2));
+    const rMargin = Math.min(
+      rr,
+      Math.floor(Math.min(marginRect.w, marginRect.h) / 2)
+    );
+    const rContent = Math.min(
+      rr,
+      Math.floor(Math.min(contentRect.w, contentRect.h) / 2)
+    );
+
+    const fillColor = settings.paddingColor || "#ffffff";
+
+    // Padding ring: outer - margin
+    if (pad.l + pad.r + pad.t + pad.b > 0) {
+      if (settings.paddingType === "colored" || !isAlpha) {
+        ctx2.beginPath();
+        smartRectPath(ctx2, outer.x, outer.y, outer.w, outer.h, rOuter, useSquircle, smoothing);
+        smartRectPath(
+          ctx2,
+          marginRect.x,
+          marginRect.y,
+          marginRect.w,
+          marginRect.h,
+          rMargin,
+          useSquircle,
+          smoothing
+        );
+        ctx2.fillStyle = fillColor;
+        ctx2.fill("evenodd");
+      }
+    }
+
+    if (applyClip) {
+      ctx2.restore();
+    }
+
+    let dataUrl, ext;
+    if (settings.format === "svg") {
+      const raster = canvas.toDataURL("image/png");
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}" viewBox="0 0 ${canvas.width} ${canvas.height}"><image href="${raster}" width="${canvas.width}" height="${canvas.height}"/></svg>`;
+      dataUrl = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+      ext = "svg";
+    } else {
+      const mime =
+        settings.format === "jpg"
+          ? "image/jpeg"
+          : settings.format === "webp"
+            ? "image/webp"
+            : "image/png";
+      const quality = (settings.quality || 90) / 100;
+      dataUrl = canvas.toDataURL(mime, quality);
+      ext =
+        settings.format === "jpg"
+          ? "jpg"
+          : settings.format === "webp"
+            ? "webp"
+            : "png";
+    }
+
+    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    const prefixSafe = sanitizeFilename(
+      settings.filenamePrefix || "element-screenshot"
+    );
+    const filename = `${prefixSafe}-${ts}.${ext}`;
+    await withTimeout(
+      new Promise((resolve) =>
+        chrome.runtime.sendMessage(
+          { type: "DOWNLOAD", dataUrl, filename },
+          resolve
+        )
+      ),
+      CAPTURE_TIMEOUT_MS
+    );
+  } catch (err) {
+    console.error("Capture flow error:", err);
+    console.log(err.stack); // helpful for debugging
+    exitCaptureMode();
+    if (box) box.style.opacity = "1";
+  }
 }
 
 /**
@@ -2048,6 +2435,12 @@ async function captureStitched(elementRect, viewportSize) {
   const savedScrollX = window.scrollX;
   const savedScrollY = window.scrollY;
 
+  // Visual feedback before starting
+  if (box) box.style.opacity = "0";
+  enterCaptureMode();
+  // Allow paint
+  await new Promise(r => requestAnimationFrame(() => setTimeout(r, 50)));
+
   // Capture all tiles
   const tileImages = [];
 
@@ -2062,11 +2455,12 @@ async function captureStitched(elementRect, viewportSize) {
 
       // Wait for scroll and paint to settle
       await new Promise(r => setTimeout(r, SCROLL_INTO_VIEW_MS));
-      await waitFrames(2);
-      await new Promise(r => setTimeout(r, FRAME_SETTLE_MS));
-
-      // Detach UI
-      const ctx = detachUI();
+      
+      // CRITICAL: Update redaction positions for the new scroll offset
+      // Since redactions are fixed elements in the shadow DOM, they need to be moved
+      // to maintain their visual position relative to the document content.
+      updateRedactionLayer();
+      
       await waitFrames(2);
       await new Promise(r => setTimeout(r, FRAME_SETTLE_MS));
 
@@ -2078,19 +2472,33 @@ async function captureStitched(elementRect, viewportSize) {
         CAPTURE_TIMEOUT_MS
       );
 
-      // Reattach UI
-      reattachUI(ctx);
-
       if (!cap?.ok) throw new Error(cap?.error || "CAPTURE_FAILED");
 
       const image = await createImageFromDataURL(cap.dataUrl);
 
-      // Calculate the region within this screenshot that we need
-      // The element portion starts at (0, 0) since we scrolled to position it there
-      const cropX = 0;
-      const cropY = 0;
-      const cropWidth = Math.min(tile.width * dpr, image.width);
-      const cropHeight = Math.min(tile.height * dpr, image.height);
+      // Read actual scroll position (browser might clamp it)
+      const actualScrollX = window.scrollX;
+      const actualScrollY = window.scrollY;
+
+      // Calculate the visual offset between where we wanted to catch the tile start (tile.docX)
+      // and where the viewport actually starts (actualScrollX).
+      // If we scrolled exactly to tile.docX, offset is 0.
+      // If we are clamped (e.g. at bottom right), actualScroll < tile.docX, so offset > 0.
+      // This offset is how far INTO the viewport the tile data starts.
+      const visualOffsetX = Math.max(0, tile.docX - actualScrollX);
+      const visualOffsetY = Math.max(0, tile.docY - actualScrollY);
+
+      const dprVisualOffsetX = Math.floor(visualOffsetX * dpr);
+      const dprVisualOffsetY = Math.floor(visualOffsetY * dpr);
+
+      // Crop coordinates from the captured screenshot
+      const cropX = dprVisualOffsetX;
+      const cropY = dprVisualOffsetY;
+      
+      // The width/height we want to take is the tile's intended W/H, 
+      // but constrained by what's available in the image from the crop point.
+      const cropWidth = Math.min(Math.ceil(tile.width * dpr), image.width - cropX);
+      const cropHeight = Math.min(Math.ceil(tile.height * dpr), image.height - cropY);
 
       tileImages.push({
         image,
@@ -2099,7 +2507,8 @@ async function captureStitched(elementRect, viewportSize) {
         cropY,
         cropWidth,
         cropHeight,
-        // Position in final stitched canvas (document position relative to captureRect)
+        // Position in final stitched canvas is still based on the grid index (tile.docX),
+        // because we are effectively "filling" that grid cell with the data we found.
         destX: (tile.docX - captureRect.x) * dpr,
         destY: (tile.docY - captureRect.y) * dpr,
       });
@@ -2111,7 +2520,12 @@ async function captureStitched(elementRect, viewportSize) {
       top: savedScrollY,
       behavior: 'instant',
     });
-    await new Promise(r => setTimeout(r, SCROLL_INTO_VIEW_MS));
+    // Restore UI
+    exitCaptureMode();
+    if (box) box.style.opacity = "1";
+    // Ensure redactions are back in correct place for original scroll
+    await new Promise(r => setTimeout(r, 50));
+    updateRedactionLayer();
   }
 
   // Create stitched canvas
@@ -2155,6 +2569,8 @@ async function captureStitched(elementRect, viewportSize) {
       ti.cropHeight
     );
   }
+
+  // NOTE: Redactions are ALREADY captured in the tiles. No need to draw them.
 
   // Handle padding fill (similar to single capture)
   const outer = { x: 0, y: 0, w: canvas.width, h: canvas.height };
@@ -2230,217 +2646,6 @@ async function captureStitched(elementRect, viewportSize) {
     ),
     CAPTURE_TIMEOUT_MS
   );
-}
-
-async function captureFlow() {
-  try {
-    if (!currentTarget || !document.contains(currentTarget)) return;
-
-    // Get element rect in document coordinates to check if it needs stitching
-    const elementDocRect = getElementDocumentRect(currentTarget);
-    const viewportSize = { width: window.innerWidth, height: window.innerHeight };
-    const margin = Number(settings.captureMargin) || 0;
-
-    // Check if element (with margin) exceeds viewport dimensions
-    const totalWidth = elementDocRect.width + margin * 2;
-    const totalHeight = elementDocRect.height + margin * 2;
-    const needsStitching = totalWidth > viewportSize.width || totalHeight > viewportSize.height;
-
-    if (needsStitching) {
-      // Use multi-screenshot stitching for large elements
-      await captureStitched(elementDocRect, viewportSize);
-      return;
-    }
-
-    // Single screenshot capture for elements that fit in viewport
-    currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" });
-    await new Promise((r) => setTimeout(r, SCROLL_INTO_VIEW_MS));
-    const r = currentTarget.getBoundingClientRect();
-    currentRect = {
-      x: Math.round(r.left),
-      y: Math.round(r.top),
-      width: Math.round(r.width),
-      height: Math.round(r.height),
-    };
-
-    // Detach UI to guarantee it won't appear in capture
-    const ctx = detachUI();
-    await waitFrames(2);
-    await new Promise((r) => setTimeout(r, FRAME_SETTLE_MS));
-
-    const dpr = window.devicePixelRatio || 1;
-    const cap = await withTimeout(
-      new Promise((resolve) =>
-        chrome.runtime.sendMessage({ type: "CAPTURE" }, resolve)
-      ),
-      CAPTURE_TIMEOUT_MS
-    );
-
-    reattachUI(ctx);
-
-    if (!cap?.ok) throw new Error(cap?.error || "CAPTURE_FAILED");
-
-    const image = await createImageFromDataURL(cap.dataUrl);
-    const canvas = document.createElement("canvas");
-    const targetW = Math.max(1, Math.floor(currentRect.width * dpr));
-    const targetH = Math.max(1, Math.floor(currentRect.height * dpr));
-    const marginPx = Math.max(
-      0,
-      Math.floor((Number(settings.captureMargin) || 0) * dpr)
-    );
-    const pad = getPadsPx(dpr);
-    // Compute crop rect with margin and clamp to captured image bounds
-    const rawSx = Math.floor(currentRect.x * dpr) - marginPx;
-    const rawSy = Math.floor(currentRect.y * dpr) - marginPx;
-    const rawSW = targetW + marginPx * 2;
-    const rawSH = targetH + marginPx * 2;
-    const sx = Math.max(0, rawSx);
-    const sy = Math.max(0, rawSy);
-    const sWidth = Math.min(
-      rawSW - (sx - rawSx),
-      Math.max(0, image.width - sx)
-    );
-    const sHeight = Math.min(
-      rawSH - (sy - rawSy),
-      Math.max(0, image.height - sy)
-    );
-
-    canvas.width = sWidth + pad.l + pad.r;
-    canvas.height = sHeight + pad.t + pad.b;
-    const ctx2 = canvas.getContext("2d");
-
-    const isAlpha = supportsAlpha(settings.format);
-    const rr = Math.max(0, Number(settings.roundedRadius) || 0);
-    const useSquircle = !!settings.squircleRounding;
-    const smoothing = Math.max(0, Math.min(1, Number(settings.cornerSmoothing) || 0.6));
-    const applyClip = rr > 0;
-    if (applyClip) {
-      ctx2.save();
-      const r = Math.min(
-        rr,
-        Math.floor(Math.min(canvas.width, canvas.height) / 2)
-      );
-      const x = 0,
-        y = 0,
-        w = canvas.width,
-        h = canvas.height;
-      ctx2.beginPath();
-      smartRectPath(ctx2, x, y, w, h, r, useSquircle, smoothing);
-      ctx2.clip();
-    }
-
-    // Always start with a cleared canvas inside the outer clip
-    ctx2.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Draw the captured content first
-    ctx2.drawImage(
-      image,
-      sx,
-      sy,
-      sWidth,
-      sHeight,
-      pad.l,
-      pad.t,
-      sWidth,
-      sHeight
-    );
-
-    // Compute rects for ring fills
-    const outer = { x: 0, y: 0, w: canvas.width, h: canvas.height };
-    const marginRect = { x: pad.l, y: pad.t, w: sWidth, h: sHeight };
-    const trimLeft = Math.max(0, sx - rawSx);
-    const trimTop = Math.max(0, sy - rawSy);
-    const trimRight = Math.max(0, rawSW - trimLeft - sWidth);
-    const trimBottom = Math.max(0, rawSH - trimTop - sHeight);
-    const mLeft = Math.max(0, marginPx - trimLeft);
-    const mTop = Math.max(0, marginPx - trimTop);
-    const mRight = Math.max(0, marginPx - trimRight);
-    const mBottom = Math.max(0, marginPx - trimBottom);
-    const contentRect = {
-      x: marginRect.x + mLeft,
-      y: marginRect.y + mTop,
-      w: Math.max(0, marginRect.w - mLeft - mRight),
-      h: Math.max(0, marginRect.h - mTop - mBottom),
-    };
-
-    const rOuter = Math.min(rr, Math.floor(Math.min(outer.w, outer.h) / 2));
-    const rMargin = Math.min(
-      rr,
-      Math.floor(Math.min(marginRect.w, marginRect.h) / 2)
-    );
-    const rContent = Math.min(
-      rr,
-      Math.floor(Math.min(contentRect.w, contentRect.h) / 2)
-    );
-
-    const fillColor = settings.paddingColor || "#ffffff";
-
-    // Padding ring: outer - margin
-    if (pad.l + pad.r + pad.t + pad.b > 0) {
-      if (settings.paddingType === "colored" || !isAlpha) {
-        ctx2.beginPath();
-        smartRectPath(ctx2, outer.x, outer.y, outer.w, outer.h, rOuter, useSquircle, smoothing);
-        smartRectPath(
-          ctx2,
-          marginRect.x,
-          marginRect.y,
-          marginRect.w,
-          marginRect.h,
-          rMargin,
-          useSquircle,
-          smoothing
-        );
-        ctx2.fillStyle = fillColor;
-        ctx2.fill("evenodd");
-      } else {
-        // transparent: nothing to draw for padding band
-      }
-    }
-
-    if (applyClip) {
-      ctx2.restore();
-    }
-
-    let dataUrl, ext;
-    if (settings.format === "svg") {
-      const raster = canvas.toDataURL("image/png");
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}" viewBox="0 0 ${canvas.width} ${canvas.height}"><image href="${raster}" width="${canvas.width}" height="${canvas.height}"/></svg>`;
-      dataUrl = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
-      ext = "svg";
-    } else {
-      const mime =
-        settings.format === "jpg"
-          ? "image/jpeg"
-          : settings.format === "webp"
-            ? "image/webp"
-            : "image/png";
-      const quality = (settings.quality || 90) / 100;
-      dataUrl = canvas.toDataURL(mime, quality);
-      ext =
-        settings.format === "jpg"
-          ? "jpg"
-          : settings.format === "webp"
-            ? "webp"
-            : "png";
-    }
-
-    const ts = new Date().toISOString().replace(/[:.]/g, "-");
-    const prefixSafe = sanitizeFilename(
-      settings.filenamePrefix || "element-screenshot"
-    );
-    const filename = `${prefixSafe}-${ts}.${ext}`;
-    await withTimeout(
-      new Promise((resolve) =>
-        chrome.runtime.sendMessage(
-          { type: "DOWNLOAD", dataUrl, filename },
-          resolve
-        )
-      ),
-      CAPTURE_TIMEOUT_MS
-    );
-  } catch (err) {
-    console.warn("Element Shot error:", err);
-  }
 }
 
 function createImageFromDataURL(dataUrl) {
@@ -2559,3 +2764,462 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 chrome.runtime.sendMessage({ type: "GET_ACTIVE" }, (res) => {
   if (res?.active) enable();
 });
+
+// --- Redaction Logic ---
+
+function toggleRedactionMode() {
+  REDACT_MODE = !REDACT_MODE;
+  if (!REDACT_MODE) {
+    selectedRedactionId = null;
+  }
+
+  if (overlay) {
+    ensureRedactionLayer();
+    updateRedactionLayer();
+  }
+
+  renderPanel();
+}
+
+function syncSettingsFromItem(item) {
+  if (!item) return;
+  redactionSettings.shape = item.shape;
+  redactionSettings.style = item.style;
+  redactionSettings.color = item.color;
+  redactionSettings.intensity = item.intensity;
+}
+
+function ensureRedactionLayer() {
+  if (!shadowRoot) return;
+  let layer = shadowRoot.getElementById('es-redaction-layer');
+  if (!layer) {
+    layer = document.createElement('div');
+    layer.id = 'es-redaction-layer';
+    // Insert before panel but after outline/padmask
+    // Panel is at Z_PANEL, Redaction is at Z_PADMASK + 1
+    if (panel && panel.parentNode === shadowRoot) {
+      shadowRoot.insertBefore(layer, panel);
+    } else {
+      shadowRoot.appendChild(layer);
+    }
+
+    // Bind events
+    layer.addEventListener('mousedown', onRedactionMouseDown);
+    window.addEventListener('mousemove', onRedactionMouseMove);
+    window.addEventListener('mouseup', onRedactionMouseUp);
+    layer.addEventListener('keydown', onRedactionKeyDown);
+  }
+  
+  // Visibility: Visible if redaction mode is on OR if we have redactions
+  const hasRedactions = redactions.length > 0;
+  const show = REDACT_MODE || hasRedactions;
+  layer.style.display = show ? 'block' : 'none';
+  
+  // Interactivity: Only in redact mode
+  if (REDACT_MODE) {
+    layer.classList.remove('readonly');
+  } else {
+    layer.classList.add('readonly');
+  }
+
+  redactionLayer = layer;
+}
+
+function updateRedactionLayer() {
+  if (!redactionLayer) return;
+
+  // Clear existing
+  redactionLayer.innerHTML = '';
+
+  if (redactions.length === 0) return;
+
+  // We need to map document coordinates back to viewport coordinates for display
+  // Redactions are stored in document coordinates (relative to page)
+  const scrollX = window.scrollX;
+  const scrollY = window.scrollY;
+
+  redactions.forEach(r => {
+    const div = document.createElement('div');
+    div.className = `es-r-item ${selectedRedactionId === r.id ? 'selected' : ''}`;
+
+    // Convert doc coords to viewport
+    const vx = r.x - scrollX;
+    const vy = r.y - scrollY;
+
+    div.style.left = vx + 'px';
+    div.style.top = vy + 'px';
+    div.style.width = r.width + 'px';
+    div.style.height = r.height + 'px';
+
+    if (r.shape === 'circle') {
+      div.style.borderRadius = '50%';
+    }
+
+    if (r.style === 'solid') {
+      div.style.backgroundColor = r.color;
+    } else if (r.style === 'blur') {
+      // For privacy, blur should be heavy.
+      div.style.backdropFilter = `blur(${r.intensity / 5}px)`;
+      div.style.background = 'rgba(255,255,255,0.01)'; // Needed for event hit
+    } else if (r.style === 'pixelate') {
+      // CSS doesn't have a native pixelate backdrop filter, so we use a fallback preview
+      div.style.backdropFilter = `blur(${r.intensity / 10}px)`;
+      div.style.backgroundImage = 'repeating-linear-gradient(45deg, rgba(0,0,0,0.1) 25%, transparent 25%, transparent 75%, rgba(0,0,0,0.1) 75%, rgba(0,0,0,0.1)), repeating-linear-gradient(45deg, rgba(0,0,0,0.1) 25%, transparent 25%, transparent 75%, rgba(0,0,0,0.1) 75%, rgba(0,0,0,0.1))';
+      div.style.backgroundPosition = '0 0, 4px 4px';
+      div.style.backgroundSize = '8px 8px';
+    }
+
+    div.onmousedown = (e) => {
+      if (!REDACT_MODE) return;
+      e.stopPropagation();
+      selectedRedactionId = r.id;
+      syncSettingsFromItem(r);
+      updateRedactionLayer();
+      renderPanel();
+      startMoving(e, r);
+    };
+
+    if (selectedRedactionId === r.id) {
+      // Add resize handle (bottom-right for simplicity initially)
+      const handle = document.createElement('div');
+      handle.className = 'es-r-handle';
+      handle.style.right = '-4px';
+      handle.style.bottom = '-4px';
+      handle.style.cursor = 'nwse-resize';
+      handle.onmousedown = (e) => {
+        if (!REDACT_MODE) return;
+        e.stopPropagation();
+        startResizing(e, r);
+      };
+      div.appendChild(handle);
+    }
+
+    redactionLayer.appendChild(div);
+  });
+}
+
+function generateId() {
+  return Math.random().toString(36).substr(2, 9);
+}
+
+// Interaction state
+let isDrawing = false;
+let isResizing = false;
+let isMoving = false;
+let dragStart = null;
+let activeItem = null;
+
+function onRedactionMouseDown(e) {
+  if (!REDACT_MODE || e.button !== 0) return;
+  if (e.target.closest('.es-r-handle')) return; // Handled by handle
+  if (e.target.closest('.es-r-item')) return; // Handled by item
+
+  isDrawing = true;
+  const id = generateId();
+  const scrollX = window.scrollX;
+  const scrollY = window.scrollY;
+
+  dragStart = { x: e.clientX, y: e.clientY };
+
+  const newItem = {
+    id,
+    x: e.clientX + scrollX,
+    y: e.clientY + scrollY,
+    width: 0,
+    height: 0,
+    shape: redactionSettings.shape,
+    style: redactionSettings.style,
+    color: redactionSettings.color,
+    intensity: redactionSettings.intensity
+  };
+
+  redactions.push(newItem);
+  selectedRedactionId = id;
+  activeItem = newItem;
+
+  // Auto-select circle if shift held? 
+  // Implemented via updates
+}
+
+function startResizing(e, item) {
+  isResizing = true;
+  dragStart = { x: e.clientX, y: e.clientY };
+  activeItem = item;
+  // Store initial dimensions
+  activeItem._startW = item.width;
+  activeItem._startH = item.height;
+}
+
+function startMoving(e, item) {
+  isMoving = true;
+  dragStart = { x: e.clientX, y: e.clientY };
+  activeItem = item;
+  // Store initial pos
+  activeItem._startX = item.x;
+  activeItem._startY = item.y;
+}
+
+function onRedactionMouseMove(e) {
+  if (!REDACT_MODE) return;
+
+  if (isDrawing && activeItem) {
+    const dx = e.clientX - dragStart.x;
+    const dy = e.clientY - dragStart.y;
+
+    let w = Math.abs(dx);
+    let h = Math.abs(dy);
+
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+
+    // If shift held, lock aspect ratio
+    if (e.shiftKey) {
+      const max = Math.max(w, h);
+      w = max;
+      h = max;
+    }
+
+    // Determine top-left based on drag direction
+    activeItem.width = w;
+    activeItem.height = h;
+    activeItem.x = (dx < 0 ? dragStart.x + dx : dragStart.x) + scrollX;
+    activeItem.y = (dy < 0 ? dragStart.y + dy : dragStart.y) + scrollY;
+
+    requestAnimationFrame(updateRedactionLayer);
+  } else if (isResizing && activeItem) {
+    const dx = e.clientX - dragStart.x;
+    const dy = e.clientY - dragStart.y;
+
+    activeItem.width = Math.max(10, activeItem._startW + dx);
+    activeItem.height = Math.max(10, activeItem._startH + dy);
+
+    if (e.shiftKey) {
+      const max = Math.max(activeItem.width, activeItem.height);
+      activeItem.width = max;
+      activeItem.height = max;
+    }
+
+    requestAnimationFrame(updateRedactionLayer);
+  } else if (isMoving && activeItem) {
+    const dx = e.clientX - dragStart.x;
+    const dy = e.clientY - dragStart.y;
+
+    activeItem.x = activeItem._startX + dx;
+    activeItem.y = activeItem._startY + dy;
+
+    requestAnimationFrame(updateRedactionLayer);
+  }
+}
+
+function onRedactionMouseUp() {
+  isDrawing = false;
+  isResizing = false;
+  isMoving = false;
+  activeItem = null;
+  dragStart = null;
+
+  if (redactionLayer) {
+    // Redraw to ensure handles etc are correct
+    updateRedactionLayer();
+    renderPanel(); // Update count
+  }
+}
+
+function onRedactionKeyDown(e) {
+  if (!REDACT_MODE) return;
+  if ((e.key === 'Delete' || e.key === 'Backspace') && selectedRedactionId) {
+    redactions = redactions.filter(r => r.id !== selectedRedactionId);
+    selectedRedactionId = null;
+    updateRedactionLayer();
+    renderPanel();
+  }
+}
+
+function renderRedactionControls() {
+  const isSolid = redactionSettings.style === 'solid';
+  const isBlur = redactionSettings.style === 'blur';
+  const isPixelate = redactionSettings.style === 'pixelate';
+  const isRect = redactionSettings.shape === 'rect';
+  const isCircle = redactionSettings.shape === 'circle';
+
+  // Generate list of redactions
+  const listHtml = redactions.map((r, i) => {
+    const label = `${r.shape === 'rect' ? 'Rect' : 'Circle'} (${r.style})`;
+    const isSelected = selectedRedactionId === r.id;
+    return `
+        <div class="row" style="justify-content:space-between; align-items:center; border:${isSelected ? '1px solid var(--es-primary)' : '1px solid transparent'}; border-radius:4px; padding:2px 4px;">
+            <div class="muted" style="cursor:pointer;" id="es-rd-sel-${r.id}">${label}</div>
+            <button class="btn" style="height:24px; padding:0 8px; font-size:12px;" id="es-rd-del-${r.id}">Delete</button>
+        </div>
+      `;
+  }).join('');
+
+  return `
+    <div style="padding-bottom:10px; margin-bottom:10px;">
+      <label>Shape</label>
+      <div class="row">
+        <button class="btn ${isRect ? "primary" : ""}" id="es-rd-rect" title="Rectangle">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+        </button>
+        <button class="btn ${isCircle ? "primary" : ""}" id="es-rd-circle" title="Circle">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle></svg>
+        </button>
+      </div>
+
+      <label style="margin-top:8px;">Style</label>
+      <div class="row">
+        <button class="btn ${isSolid ? "primary" : ""}" id="es-rd-solid">Solid</button>
+        <button class="btn ${isBlur ? "primary" : ""}" id="es-rd-blur">Blur</button>
+        <button class="btn ${isPixelate ? "primary" : ""}" id="es-rd-pixel">Pixelate</button>
+      </div>
+
+      ${isSolid ? `
+        <label style="margin-top:8px;">Color</label>
+        <div class="row">
+          <input type="color" id="es-rd-color" value="${redactionSettings.color}" style="width:100%;">
+        </div>
+      ` : ''}
+
+      ${(isBlur || isPixelate) ? `
+        <label style="margin-top:8px;">Intensity</label>
+        <div class="row">
+           <input type="range" id="es-rd-intensity" min="0" max="100" value="${redactionSettings.intensity}">
+        </div>
+      ` : ''}
+      
+      <div class="row" style="margin-top:12px; justify-content:space-between; align-items:center;">
+         <label style="margin:0;">Clean up</label>
+         <button class="btn ghost" id="es-rd-clear" style="color:var(--es-destructive, #ef4444); height:24px; font-size:12px;">Clear All</button>
+      </div>
+      <div class="muted" style="margin-bottom:6px;">${redactions.length} items</div>
+      <div style="display:grid; gap:4px; max-height:120px; overflow:auto;">
+        ${listHtml || '<div class="muted">No items yet.</div>'}
+      </div>
+    </div>
+  `;
+}
+
+function showConfirmModal(title, message, onConfirm) {
+  if (!shadowRoot) return;
+
+  // Remove existing if any
+  const existing = shadowRoot.getElementById('es-confirm-modal');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'es-confirm-modal';
+  overlay.className = 'es-modal-overlay';
+
+  // Trap clicks on overlay to close
+  overlay.onclick = (e) => {
+    if (e.target === overlay) overlay.remove();
+  };
+
+  const modal = document.createElement('div');
+  modal.className = 'es-modal';
+
+  modal.innerHTML = `
+        <h3>${title}</h3>
+        <p>${message}</p>
+        <div class="es-modal-actions">
+            <button class="es-btn ghost" id="es-modal-cancel">Cancel</button>
+            <button class="es-btn destructive" id="es-modal-confirm">Clear All</button>
+        </div>
+    `;
+
+  overlay.appendChild(modal);
+  shadowRoot.appendChild(overlay);
+
+  // Bind buttons
+  const cancelBtn = modal.querySelector('#es-modal-cancel');
+  const confirmBtn = modal.querySelector('#es-modal-confirm');
+
+  cancelBtn.onclick = () => overlay.remove();
+  confirmBtn.onclick = () => {
+    onConfirm();
+    overlay.remove();
+  };
+
+  cancelBtn.focus();
+}
+
+function bindRedactionEvents() {
+  if (!REDACT_MODE || !panel) return;
+
+  const on = (id, fn) => {
+    const el = panel.querySelector(id);
+    if (el) el.onclick = fn;
+  };
+
+  on('#es-rd-rect', () => { redactionSettings.shape = 'rect'; renderPanel(); });
+  on('#es-rd-circle', () => { redactionSettings.shape = 'circle'; renderPanel(); });
+  on('#es-rd-solid', () => { redactionSettings.style = 'solid'; renderPanel(); });
+  on('#es-rd-blur', () => { redactionSettings.style = 'blur'; renderPanel(); });
+  on('#es-rd-pixel', () => { redactionSettings.style = 'pixelate'; renderPanel(); });
+
+  on('#es-rd-clear', () => {
+    showConfirmModal(
+      'Clear Redactions',
+      'Are you sure you want to remove all redactions? This action cannot be undone.',
+      () => {
+        redactions = [];
+        selectedRedactionId = null;
+        updateRedactionLayer();
+        renderPanel();
+      }
+    );
+  });
+
+  const colorEl = panel.querySelector('#es-rd-color');
+  if (colorEl) {
+    colorEl.oninput = (e) => {
+      redactionSettings.color = e.target.value;
+      if (selectedRedactionId) {
+        const r = redactions.find(x => x.id === selectedRedactionId);
+        if (r && r.style === 'solid') {
+          r.color = redactionSettings.color;
+          updateRedactionLayer();
+        }
+      }
+    };
+  }
+
+  const intEl = panel.querySelector('#es-rd-intensity');
+  if (intEl) {
+    intEl.oninput = (e) => {
+      redactionSettings.intensity = Number(e.target.value);
+      if (selectedRedactionId) {
+        const r = redactions.find(x => x.id === selectedRedactionId);
+        if (r && (r.style === 'blur' || r.style === 'pixelate')) {
+          r.intensity = redactionSettings.intensity;
+          updateRedactionLayer();
+        }
+      }
+    };
+  }
+
+  // Bind item list events
+  redactions.forEach(r => {
+    const delBtn = panel.querySelector(`#es-rd-del-${r.id}`);
+    if (delBtn) {
+      delBtn.onclick = (e) => {
+        e.stopPropagation();
+        redactions = redactions.filter(item => item.id !== r.id);
+        if (selectedRedactionId === r.id) selectedRedactionId = null;
+        updateRedactionLayer();
+        renderPanel();
+      };
+    }
+
+    const selEl = panel.querySelector(`#es-rd-sel-${r.id}`);
+    if (selEl) {
+      selEl.onclick = (e) => {
+        e.stopPropagation();
+        selectedRedactionId = r.id;
+        syncSettingsFromItem(r);
+        updateRedactionLayer();
+        renderPanel();
+      };
+    }
+  });
+}
