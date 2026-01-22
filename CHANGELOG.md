@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.1] - 2026-01-22
+- **Bug Fixes:**
+  - Fixed an issue where the "Filename Prefix" input in the panel would not update when settings were changed externally.
+  - Fixed race condition where typing in the filename field could be overwritten by background sync.
+  - Implemented `chrome.downloads.onDeterminingFilename` listener to rigorously enforce filenames, bypassing Manifest V3 restrictions that could cause the filename to be ignored.
+
 ## [0.3.0] - 2026-01-17
 - **New Feature: Redaction Tools:**
   - Added comprehensive tools to redact sensitive content before capturing.

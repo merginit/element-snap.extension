@@ -165,6 +165,19 @@ chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
   }
 });
 
+// Enforce filenames
+let _nextDownloadFilename = null;
+
+chrome.downloads.onDeterminingFilename.addListener((_item, suggest) => {
+  if (_nextDownloadFilename) {
+    console.log("Element Snap: Enforcing filename via listener:", _nextDownloadFilename);
+    suggest({ filename: _nextDownloadFilename, conflictAction: "uniquify" });
+    _nextDownloadFilename = null;
+  } else {
+    suggest();
+  }
+});
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "GET_ACTIVE") {
     const tabId = sender?.tab?.id;
@@ -215,13 +228,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "DOWNLOAD") {
     (async () => {
       try {
+        let filename = message.filename;
+        if (!filename || typeof filename !== "string" || !filename.trim()) {
+          console.warn("Element Snap: No filename provided, using fallback.");
+          filename = `element-screenshot-${Date.now()}.png`;
+        }
+
+        console.log("Element Snap: Downloading", filename);
+
+        if (!message.dataUrl) {
+          throw new Error("Missing dataUrl");
+        }
+
+        _nextDownloadFilename = filename;
+
         await chrome.downloads.download({
           url: message.dataUrl,
-          filename: message.filename,
+          filename: filename,
           saveAs: false,
+          conflictAction: "uniquify"
         });
         sendResponse({ ok: true });
       } catch (e) {
+        console.error("Element Snap: Download failed", e);
+        _nextDownloadFilename = null;
         sendResponse({ ok: false, error: String(e) });
       }
     })();

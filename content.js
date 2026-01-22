@@ -719,6 +719,7 @@ function applyHostTheme() {
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "sync" && changes.elementShotPrefs) {
     const newPrefs = migrateSettings(changes.elementShotPrefs.newValue || DEFAULTS);
+    console.log("Element Snap: Storage changed, new prefs:", newPrefs);
     const themeChanged = newPrefs.theme !== settings.theme;
 
     // Update all settings
@@ -1685,6 +1686,17 @@ function updatePanelDynamicContent() {
     if (cBtn) cBtn.classList.toggle("primary", settings.paddingType === "colored");
   }
 
+  // Update text input for filename
+  // Only update if not focused to prevent overwriting user typing (race condition with storage sync)
+  const nameEl = panel.querySelector("#es-name");
+  // Check focus within shadow root
+  const activeEl = shadowRoot ? shadowRoot.activeElement : null;
+  
+  if (nameEl && activeEl !== nameEl && nameEl.value !== settings.filenamePrefix) {
+    console.log("Element Snap: Syncing filename to:", settings.filenamePrefix);
+    nameEl.value = settings.filenamePrefix || "";
+  }
+
   updateHiddenList();
   applyPanelOpacity();
 }
@@ -2349,10 +2361,16 @@ async function captureFlow() {
     }
 
     const ts = new Date().toISOString().replace(/[:.]/g, "-");
-    const prefixSafe = sanitizeFilename(
-      settings.filenamePrefix || "element-screenshot"
-    );
+
+    // WYSIWYG: Prefer the value currently in the input field to avoid race conditions with storage sync
+    const nameEl = panel ? panel.querySelector("#es-name") : null;
+    const currentPrefix = nameEl ? nameEl.value : settings.filenamePrefix;
+    const rawPrefix = currentPrefix && currentPrefix.trim() ? currentPrefix : "element-screenshot";
+
+    const prefixSafe = sanitizeFilename(rawPrefix);
     const filename = `${prefixSafe}-${ts}.${ext}`;
+
+    console.log("Element Snap: Initiating download with filename:", filename);
     await withTimeout(
       new Promise((resolve) =>
         chrome.runtime.sendMessage(
@@ -2455,12 +2473,12 @@ async function captureStitched(elementRect, viewportSize) {
 
       // Wait for scroll and paint to settle
       await new Promise(r => setTimeout(r, SCROLL_INTO_VIEW_MS));
-      
+
       // CRITICAL: Update redaction positions for the new scroll offset
       // Since redactions are fixed elements in the shadow DOM, they need to be moved
       // to maintain their visual position relative to the document content.
       updateRedactionLayer();
-      
+
       await waitFrames(2);
       await new Promise(r => setTimeout(r, FRAME_SETTLE_MS));
 
@@ -2494,7 +2512,7 @@ async function captureStitched(elementRect, viewportSize) {
       // Crop coordinates from the captured screenshot
       const cropX = dprVisualOffsetX;
       const cropY = dprVisualOffsetY;
-      
+
       // The width/height we want to take is the tile's intended W/H, 
       // but constrained by what's available in the image from the crop point.
       const cropWidth = Math.min(Math.ceil(tile.width * dpr), image.width - cropX);
@@ -2809,12 +2827,12 @@ function ensureRedactionLayer() {
     window.addEventListener('mouseup', onRedactionMouseUp);
     layer.addEventListener('keydown', onRedactionKeyDown);
   }
-  
+
   // Visibility: Visible if redaction mode is on OR if we have redactions
   const hasRedactions = redactions.length > 0;
   const show = REDACT_MODE || hasRedactions;
   layer.style.display = show ? 'block' : 'none';
-  
+
   // Interactivity: Only in redact mode
   if (REDACT_MODE) {
     layer.classList.remove('readonly');
