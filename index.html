@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Element Snap - Pixel-Perfect Screenshots</title>
+    <link rel="stylesheet" href="site.css">
+    <link rel="icon" type="image/png" href="assets/icon.png">
+</head>
+
+<body>
+
+    <header>
+        <div class="container header-content">
+            <a href="#" class="logo">
+                <img src="assets/icon.png" alt="Element Snap Logo">
+                Element Snap
+            </a>
+            <a href="https://github.com/jonasfroeller/element-snap" class="btn btn-secondary"
+                style="font-size: 0.85rem; height: 32px;">
+                GitHub
+            </a>
+        </div>
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="container">
+                <h1>Capture beautiful, pixel-perfect element screenshots.</h1>
+                <p>A lightweight, reliable Chrome extension that preserves the page's original styling. No broken layouts, just what you
+                    see.</p>
+
+                <div class="hero-actions">
+                    <a href="https://chromewebstore.google.com/detail/element-snap/nldbbahmckpcjcbikdaopeaiidhdomkf"
+                        class="btn btn-primary">Add to Chrome</a>
+                    <a href="https://github.com/jonasfroeller/element-snap" class="btn btn-secondary">Documentation</a>
+                </div>
+
+                <div class="preview-container">
+                    <img src="assets/extension-light.png" alt="Extension Interface" class="light-only">
+                    <img src="assets/extension-dark.png" alt="Extension Interface" class="dark-only">
+                </div>
+            </div>
+        </section>
+
+        <section class="features">
+            <div class="container">
+                <h2>Designed for details.</h2>
+                <div class="bento-grid">
+                    <div class="bento-card bento-wide">
+                        <h3>Pixel-Perfect, Every Time</h3>
+                        <p>Unlike tools that re-render HTML, Element Snap captures the actual pixels on your screen.
+                            Fonts, shadows, and complex CSS are preserved exactly as they appear.</p>
+                    </div>
+                    <div class="bento-card">
+                        <h3>Privacy First</h3>
+                        <p>Zero tracking. Zero external requests. Everything happens locally in your browser.</p>
+                    </div>
+                    <div class="bento-card">
+                        <h3>Smart Stitching</h3>
+                        <p>Automatically detects and stitches scrolling elements into a single seamless image.</p>
+                    </div>
+                    <div class="bento-card">
+                        <h3>Theme Aware</h3>
+                        <p>Interface automatically adapts to your system's Light or Dark mode preference.</p>
+                    </div>
+                    <div class="bento-card">
+                        <h3>Padding Controls</h3>
+                        <p>Add breathable whitespace around your captures with real-time preview.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="how-to">
+            <div class="container">
+                <div class="steps-grid">
+                    <div class="step-item">
+                        <div class="step-number">01</div>
+                        <h3>Activate</h3>
+                        <p>Click the extension icon in your toolbar to wake it up.</p>
+                    </div>
+                    <div class="step-item">
+                        <div class="step-number">02</div>
+                        <h3>Select</h3>
+                        <p>Hover over any DOM element to highlight your target.</p>
+                    </div>
+                    <div class="step-item">
+                        <div class="step-number">03</div>
+                        <h3>Snap</h3>
+                        <p>Hold <code>Cmd/Ctrl</code> and click to instantly capture.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container footer-content">
+            <div>
+                &copy; <span id="year">2025</span> <a href="https://merginit.com" target="_blank" rel="noopener">MerginIT e.U.</a>
+            </div>
+            <div class="footer-links">
+                <a href="https://github.com/jonasfroeller/element-snap">GitHub</a>
+                <a href="https://chromewebstore.google.com/detail/element-snap/nldbbahmckpcjcbikdaopeaiidhdomkf">Chrome
+                    Web Store</a>
+                <a href="LICENSE">License</a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        document.getElementById('year').textContent = new Date().getFullYear();
+    </script>
+</body>
+
+</html>
