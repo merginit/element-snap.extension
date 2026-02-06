@@ -41,6 +41,7 @@ This approach is:
 * **Capture Margin:** Include real page pixels around the element for context.
 * **Flexible Output:** Save as PNG, JPG, WEBP, or SVG. Adjust quality for lossy formats.
 * **Rounded Corners:** Apply standard or squircle (smooth, iOS-like) corner rounding to exports.
+* **Redaction Tools:** Blur, pixelate, or cover sensitive data before sharing.
 * **Theme Support:** Light, Dark, or System theme with automatic detection.
 * **Element Hiding:** Temporarily hide surrounding elements with a keypress (`H`) for a clean shot.
 * **Dim Mode:** Reduce overlay opacity for better visibility of underlying content.

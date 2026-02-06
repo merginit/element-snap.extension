@@ -12,9 +12,9 @@ Was enthalten ist:
 ● Mehrere Export-Formate – PNG, JPG, WEBP oder SVG mit Qualitätskontrolle  
 ● Theme-Unterstützung – Hell, Dunkel oder System mit automatischer Erkennung  
 ● Schwärzungswerkzeuge – Verwischen, Verpixeln oder vertrauliche Daten abdecken vor dem Teilen  
-● Elemente ausblenden – Ablenkungen temporär mit einem Tastendruck ausblenden (H)  
+● Elemente ausblenden – Ablenkungen temporär mit einem Tastendruck ausblenden (H) oder Wiederherstellen (R)  
 ● Dimm-Modus – Overlay-Deckkraft reduzieren für bessere Sichtbarkeit  
-● Schneller Workflow – Hovern zum Auswählen, dann Strg/Cmd+Klick zum Erfassen
+● Schneller Workflow – Hovern zum Auswählen, Fokus sperren (L), dann Strg/Cmd+Klick zum Erfassen
 
 So funktioniert's:  
 1. Klicken Sie auf das Erweiterungs-Symbol, um es zu aktivieren  

@@ -12,9 +12,9 @@ What's included:
 ● Multiple export formats — PNG, JPG, WEBP, or SVG with quality control  
 ● Theme support — Light, Dark, or System with auto-detection  
 ● Redaction Tools — Blur, Pixelate, or cover sensitive data before sharing  
-● Element hiding — temporarily hide distractions with one keypress (H)  
+● Element hiding — temporarily hide distractions with one keypress (H) or Restore (R)  
 ● Dim mode — reduce overlay opacity for better visibility  
-● Fast workflow — hover to select, then Ctrl/Cmd+Click to capture
+● Fast workflow — hover to select, Lock focus (L), then Ctrl/Cmd+Click to capture
 
 How it works:
 1. Click the extension icon to activate  
