@@ -4,7 +4,7 @@
     <img src="./assets/logo.png" alt="icon" width="150" />
 </div>
 
-<div align="center" style="margin-bottom: 2.5rem;">
+<div align="center">
     <span style="font-size: 2.5rem;">
       <b><strong style="font-size: 5rem;">Element Snap</strong></b>
       <br>"A lightweight, reliable Chrome extension<br>to capture pixel-perfect screenshots of any HTML element."
