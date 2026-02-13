@@ -76,6 +76,9 @@ header {
   align-items: center;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-page);
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
 .header-content {
