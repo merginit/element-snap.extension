@@ -165,19 +165,6 @@ chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
   }
 });
 
-// Enforce filenames
-let _nextDownloadFilename = null;
-
-chrome.downloads.onDeterminingFilename.addListener((_item, suggest) => {
-  if (_nextDownloadFilename) {
-    console.log("Element Snap: Enforcing filename via listener:", _nextDownloadFilename);
-    suggest({ filename: _nextDownloadFilename, conflictAction: "uniquify" });
-    _nextDownloadFilename = null;
-  } else {
-    suggest();
-  }
-});
-
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "GET_ACTIVE") {
     const tabId = sender?.tab?.id;
@@ -240,7 +227,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           throw new Error("Missing dataUrl");
         }
 
-        _nextDownloadFilename = filename;
+        const onDeterminingFilename = (item, suggest) => {
+          if (item.url === message.dataUrl) {
+            try {
+              suggest({ filename: filename, conflictAction: "uniquify" });
+            } catch (e) {
+              suggest();
+            }
+            chrome.downloads.onDeterminingFilename.removeListener(onDeterminingFilename);
+          } else {
+            return;
+          }
+        };
+
+        chrome.downloads.onDeterminingFilename.addListener(onDeterminingFilename);
+
+        setTimeout(() => {
+          if (chrome.downloads.onDeterminingFilename.hasListener(onDeterminingFilename)) {
+            chrome.downloads.onDeterminingFilename.removeListener(onDeterminingFilename);
+          }
+        }, 5000);
 
         await chrome.downloads.download({
           url: message.dataUrl,
@@ -248,10 +254,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           saveAs: false,
           conflictAction: "uniquify"
         });
+
         sendResponse({ ok: true });
       } catch (e) {
         console.error("Element Snap: Download failed", e);
-        _nextDownloadFilename = null;
         sendResponse({ ok: false, error: String(e) });
       }
     })();

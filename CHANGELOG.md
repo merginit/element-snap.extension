@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.2] - 2026-02-18
+- **Bug Fixes:**
+  - Fixed conflict with other download extensions (e.g., "Save image as Type") by replacing the global `onDeterminingFilename` listener with a scoped, temporary listener that only activates during Element Snap downloads.
+
 ## [0.3.1] - 2026-01-22
 - **Bug Fixes:**
   - Fixed an issue where the "Filename Prefix" input in the panel would not update when settings were changed externally.
