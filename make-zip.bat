@@ -15,7 +15,7 @@ if exist "%STAGING_DIR%" rmdir /s /q "%STAGING_DIR%"
 mkdir "%STAGING_DIR%" >nul 2>&1
 
 rem stage files excluding .git, dist, and entire assets dir; exclude non-runtime docs and this script
-robocopy . "%STAGING_DIR%" /E /XD ".git" "dist" "assets" ".vscode" /XF "%ZIP_NAME%" "%SCRIPT_NAME%" ".gitignore" "CHANGELOG.md" "README.md" "STORE.md" "STORE-de-DE.md" /NFL /NDL /NJH /NJS >nul
+robocopy . "%STAGING_DIR%" /E /XD ".git" "dist" "assets" ".vscode" /XF "%ZIP_NAME%" "%SCRIPT_NAME%" ".gitignore" "CHANGELOG.md" "CNAME" "index.html" "README.md" "site.css" "STORE.md" "STORE-de-DE.md" /NFL /NDL /NJH /NJS >nul
 
 rem add required assets into staging
 set "STAGING_ASSETS=%STAGING_DIR%\assets"
