@@ -135,6 +135,8 @@ const CAPTURE_TIMEOUT_MS = 5000;
 const PERSIST_DEBOUNCE_MS = 300;
 const SCROLL_INTO_VIEW_MS = 120;
 const FRAME_SETTLE_MS = 30;
+const TOAST_DISPLAY_MS = 2500;
+const TOAST_FADE_MS = 300;
 
 const STYLE = css`
   :host {
@@ -580,6 +582,31 @@ const STYLE = css`
   }
   :host(.es-capturing) #es-redaction-layer {
     display: block !important;
+  }
+
+  /* Toast notification */
+  #es-toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--es-card);
+    color: var(--es-card-foreground);
+    border: 1px solid var(--es-border);
+    border-radius: var(--es-radius);
+    padding: 7px 16px;
+    font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    z-index: ${Z_HOST};
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+    white-space: nowrap;
+  }
+  #es-toast.es-toast-error {
+    background: var(--es-destructive);
+    color: white;
+    border-color: var(--es-destructive);
   }
 `;
 
@@ -1646,6 +1673,19 @@ function onKeyDown(e) {
     else restoreLastHidden();
     updateHiddenList();
   }
+  if (e.key === "Enter" && currentRect) {
+    // Skip if any interactive element inside the shadow root (or page) has focus
+    const activeInShadow = shadowRoot ? shadowRoot.activeElement : null;
+    const activeInPage = document.activeElement;
+    const interactiveTags = ["INPUT", "TEXTAREA", "SELECT", "BUTTON", "A"];
+    if (activeInShadow && interactiveTags.includes(activeInShadow.tagName)) return;
+    if (activeInShadow && activeInShadow.isContentEditable) return;
+    if (activeInPage && interactiveTags.includes(activeInPage.tagName)) return;
+    if (activeInPage && activeInPage.isContentEditable) return;
+    e.preventDefault();
+    e.stopPropagation();
+    captureFlow({ copyToClipboard: true });
+  }
 }
 
 function getPanelStructureKey() {
@@ -1868,7 +1908,8 @@ function renderPanel() {
     }</div>
 
       <div style="margin-top:8px; display:grid; gap:6px;">
-        <div class="shortcut"><span class="kbd">Ctrl/Cmd</span><span>+</span><span class="kbd">Click</span><span class="muted">Capture</span></div>
+        <div class="shortcut"><span class="kbd">Ctrl/Cmd</span><span>+</span><span class="kbd">Click</span><span class="muted">Save</span></div>
+        <div class="shortcut"><span class="kbd">Enter</span><span class="muted">Copy to clipboard</span></div>
         <div class="row" style="gap:12px;">
           <div class="shortcut"><span class="kbd">L</span><span class="muted">Lock/Unlock</span></div>
           <div class="shortcut"><span class="kbd">Esc</span><span class="muted">Unlock</span></div>
@@ -1878,7 +1919,8 @@ function renderPanel() {
     <div class="row" style="margin-top:8px; padding-top:8px; border-top:1px solid var(--es-border);">
       <button class="btn ghost" id="es-close">Close</button>
       <button class="btn ${REDACT_MODE ? "primary" : ""}" id="es-redact-toggle" title="Redact/Censor">Redact</button>
-      <button class="btn primary" id="es-capture">Capture</button>
+      <button class="btn" id="es-copy" title="Copy to clipboard (Enter)">Copy</button>
+      <button class="btn primary" id="es-capture">Save</button>
     </div>`;
 
   // Wire interactions
@@ -2053,6 +2095,7 @@ function renderPanel() {
     persistSettings();
   };
   panel.querySelector("#es-capture").onclick = () => captureFlow();
+  panel.querySelector("#es-copy").onclick = () => captureFlow({ copyToClipboard: true });
   const closeBtn = panel.querySelector("#es-close");
   if (closeBtn)
     closeBtn.onclick = () => {
@@ -2161,7 +2204,30 @@ function exitCaptureMode() {
   }
 }
 
-async function captureFlow() {
+function showToast(message, isError = false) {
+  ensureHost();
+  if (!shadowRoot) return;
+  const existing = shadowRoot.getElementById("es-toast");
+  if (existing) existing.remove();
+  const toast = document.createElement("div");
+  toast.id = "es-toast";
+  toast.textContent = message;
+  if (isError) toast.classList.add("es-toast-error");
+  shadowRoot.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    setTimeout(() => { if (toast.parentNode) toast.remove(); }, TOAST_FADE_MS);
+  }, TOAST_DISPLAY_MS);
+}
+
+async function copyImageToClipboard(canvas) {
+  // Chrome's Clipboard API only accepts image/png, so always write PNG.
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!blob) throw new Error("Failed to create image blob — the canvas may be tainted by cross-origin content.");
+  await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+}
+
+async function captureFlow(opts = {}) {
   try {
     if (!currentRect || !document.contains(currentTarget)) return;
 
@@ -2177,7 +2243,7 @@ async function captureFlow() {
 
     if (needsStitching) {
       // Use multi-screenshot stitching for large elements
-      await captureStitched(elementDocRect, viewportSize);
+      await captureStitched(elementDocRect, viewportSize, opts);
       return;
     }
 
@@ -2360,31 +2426,39 @@ async function captureFlow() {
             : "png";
     }
 
-    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    if (opts.copyToClipboard) {
+      await copyImageToClipboard(canvas);
+      showToast("Copied to clipboard!");
+    } else {
+      const ts = new Date().toISOString().replace(/[:.]/g, "-");
 
-    // WYSIWYG: Prefer the value currently in the input field to avoid race conditions with storage sync
-    const nameEl = panel ? panel.querySelector("#es-name") : null;
-    const currentPrefix = nameEl ? nameEl.value : settings.filenamePrefix;
-    const rawPrefix = currentPrefix && currentPrefix.trim() ? currentPrefix : "element-screenshot";
+      // WYSIWYG: Prefer the value currently in the input field to avoid race conditions with storage sync
+      const nameEl = panel ? panel.querySelector("#es-name") : null;
+      const currentPrefix = nameEl ? nameEl.value : settings.filenamePrefix;
+      const rawPrefix = currentPrefix && currentPrefix.trim() ? currentPrefix : "element-screenshot";
 
-    const prefixSafe = sanitizeFilename(rawPrefix);
-    const filename = `${prefixSafe}-${ts}.${ext}`;
+      const prefixSafe = sanitizeFilename(rawPrefix);
+      const filename = `${prefixSafe}-${ts}.${ext}`;
 
-    console.log("Element Snap: Initiating download with filename:", filename);
-    await withTimeout(
-      new Promise((resolve) =>
-        chrome.runtime.sendMessage(
-          { type: "DOWNLOAD", dataUrl, filename },
-          resolve
-        )
-      ),
-      CAPTURE_TIMEOUT_MS
-    );
+      console.log("Element Snap: Initiating download with filename:", filename);
+      await withTimeout(
+        new Promise((resolve) =>
+          chrome.runtime.sendMessage(
+            { type: "DOWNLOAD", dataUrl, filename },
+            resolve
+          )
+        ),
+        CAPTURE_TIMEOUT_MS
+      );
+    }
   } catch (err) {
     console.error("Capture flow error:", err);
     console.log(err.stack); // helpful for debugging
     exitCaptureMode();
     if (box) box.style.opacity = "1";
+    if (opts.copyToClipboard) {
+      showToast("Copy failed: " + err.message, true);
+    }
   }
 }
 
@@ -2441,7 +2515,7 @@ function calculateTiles(elementRect, viewportSize) {
 /**
  * Capture a large element by taking multiple screenshots and stitching them together.
  */
-async function captureStitched(elementRect, viewportSize) {
+async function captureStitched(elementRect, viewportSize, opts = {}) {
   const dpr = window.devicePixelRatio || 1;
   const margin = Math.floor((Number(settings.captureMargin) || 0) * dpr);
   const pad = getPadsPx(dpr);
@@ -2631,6 +2705,17 @@ async function captureStitched(elementRect, viewportSize) {
   }
 
   // Export
+  if (opts.copyToClipboard) {
+    try {
+      await copyImageToClipboard(canvas);
+      showToast("Copied to clipboard!");
+    } catch (err) {
+      console.error("Element Snap: Clipboard copy failed", err);
+      showToast("Copy failed: " + err.message, true);
+    }
+    return;
+  }
+
   let dataUrl, ext;
   if (settings.format === "svg") {
     const raster = canvas.toDataURL("image/png");

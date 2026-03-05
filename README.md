@@ -37,6 +37,7 @@ This approach is:
 
 * **Pixel-Perfect Capture:** Get a flawless image of any hovered element, including elements larger than the viewport.
 * **Full Element Capture:** Automatically detects oversized elements and stitches multiple screenshots seamlessly.
+* **Copy to Clipboard:** Copy the captured element directly to the clipboard as a PNG image — no file saved. Press `Enter` or click the **Copy** button in the panel.
 * **Live Padding Controls:** Add uniform or per-side padding with a real-time preview.
 * **Capture Margin:** Include real page pixels around the element for context.
 * **Flexible Output:** Save as PNG, JPG, WEBP, or SVG. Adjust quality for lossy formats.
@@ -45,14 +46,15 @@ This approach is:
 * **Theme Support:** Light, Dark, or System theme with automatic detection.
 * **Element Hiding:** Temporarily hide surrounding elements with a keypress (`H`) for a clean shot.
 * **Dim Mode:** Reduce overlay opacity for better visibility of underlying content.
-* **Keyboard Shortcuts:** Capture (`Ctrl/Cmd+Click`), lock focus (`L`), restore hidden elements (`R`), and more.
+* **Keyboard Shortcuts:** Save (`Ctrl/Cmd+Click`), copy to clipboard (`Enter`), lock focus (`L`), restore hidden elements (`R`), and more.
 
 ## How to Use
 
 1.  **Activate:** Click the extension icon in your toolbar to turn it on for the current tab.
 2.  **Hover:** Move your mouse to highlight the desired element.
 3.  **Adjust:** Use the floating panel to change padding, format, and other settings.
-4.  **Capture:** `Ctrl/Cmd + Click` the element or press the "Capture" button.
+4.  **Save:** `Ctrl/Cmd + Click` the element or press the **Save** button to download a file.
+5.  **Copy:** Press `Enter` or click the **Copy** button to copy the element directly to the clipboard.
 
 ## Installation
 
@@ -73,6 +75,7 @@ This approach is:
 - Uses `tabs.captureVisibleTab` to screenshot the visible area of the current window; no network transmission occurs.
 - Uses `storage.sync` to save UI preferences (padding, format, etc.).
 - Uses `downloads` to save images to your device without additional prompts.
+- Uses `clipboardWrite` to copy captured images directly to the clipboard when you press **Enter** or click **Copy**. Chrome may show a one-time permission prompt the first time you use this feature on a given site.
 
 No analytics, tracking, or external requests. All processing happens locally in your browser.
 
